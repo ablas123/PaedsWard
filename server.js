@@ -11,8 +11,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
 // ============================================================
-//  ملف البيانات (JSON) – بديل عن قاعدة البيانات
-//  يقلل استهلاك الموارد بشكل كبير
+//  ملف البيانات (JSON) – قاعدة بيانات بسيطة
 // ============================================================
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -29,11 +28,92 @@ app.get('/api/state', (req, res) => {
   }
 });
 
-// حفظ البيانات
-app.post('/api/sync', (req, res) => {
+// ============================================================
+//  نقاط نهاية التحديث الجزئي (PATCH) – لكل مجموعة
+// ============================================================
+
+// تحديث عنصر واحد في مجموعة معينة
+app.patch('/api/:collection/:id', (req, res) => {
+  const { collection, id } = req.params;
+  const updates = req.body;
+  
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(req.body, null, 2));
-    res.json({ success: true, timestamp: Date.now() });
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.status(404).json({ error: 'Data file not found' });
+    }
+    
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data[collection]) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    
+    const item = data[collection].find(item => item.id === id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    // تحديث الحقول مع الحفاظ على updatedAt
+    Object.assign(item, updates);
+    item.updatedAt = Date.now();
+    
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    res.json({ success: true, item });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// إضافة عنصر جديد إلى مجموعة
+app.post('/api/:collection', (req, res) => {
+  const { collection } = req.params;
+  const newItem = req.body;
+  
+  try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.status(404).json({ error: 'Data file not found' });
+    }
+    
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data[collection]) {
+      data[collection] = [];
+    }
+    
+    // التأكد من وجود id
+    if (!newItem.id) {
+      newItem.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+    newItem.updatedAt = Date.now();
+    
+    data[collection].push(newItem);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    res.json({ success: true, item: newItem });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// حذف عنصر من مجموعة
+app.delete('/api/:collection/:id', (req, res) => {
+  const { collection, id } = req.params;
+  
+  try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.status(404).json({ error: 'Data file not found' });
+    }
+    
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data[collection]) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    
+    const index = data[collection].findIndex(item => item.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    data[collection].splice(index, 1);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -75,7 +155,7 @@ setInterval(() => {
 // ============================================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 PaedsWard Server running on port ${PORT}`);
+  console.log(`🚀 PaedsWard Advanced Server running on port ${PORT}`);
   console.log(`📂 Data file: ${DATA_FILE}`);
   console.log(`📂 Backups: ${path.join(__dirname, 'backups')}`);
 });
