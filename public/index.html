@@ -2,333 +2,1400 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>PaedsWard - الحل النهائي</title>
-    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>🏥 PaedsWard – منظم اليوم الطبي</title>
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22PaedsWard%22%2C%22short_name%22%3A%22PaedsWard%22%2C%22start_url%22%3A%22.%2Findex.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f0f4f8%22%2C%22theme_color%22%3A%22%231a73e8%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231a73e8'%2F%3E%3Ctext%20x%3D'50'%20y%3D'65'%20font-size%3D'40'%20text-anchor%3D'middle'%20fill%3D'white'%3E%2B%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
     <style>
+        /* ===== التصميم العصري ===== */
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+        :root {
+            --primary: #1a73e8;
+            --primary-dark: #0b3d91;
+            --primary-light: #e8f0fe;
+            --danger: #e53935;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --gray: #94a3b8;
+            --dark: #1e293b;
+            --radius: 16px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
         body {
-            font-family: -apple-system, system-ui, sans-serif;
+            font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
             background: #f1f5f9;
-            padding: 16px;
-            max-width: 500px;
-            margin: auto;
+            touch-action: manipulation;
+            color: var(--dark);
+            margin: 0;
+            padding: 0;
+            direction: rtl;
         }
-        .header {
-            background: #1a73e8;
+        .app {
+            max-width: 420px;
+            margin: 0 auto;
+            background: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
+        }
+        @media (min-width: 421px) {
+            .app {
+                min-height: 90vh;
+                height: 95vh;
+                border-radius: 24px;
+                margin: 20px auto;
+            }
+            body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background: #dce3ed;
+            }
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
             color: white;
-            padding: 16px;
-            border-radius: 16px 16px 0 0;
+            padding: 12px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-radius: 0 0 24px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            gap: 6px;
         }
-        .status-bar {
-            background: #e2e8f0;
-            padding: 8px 16px;
+        header .brand {
+            font-size: 18px;
+            font-weight: 800;
+        }
+        header .brand small {
+            font-weight: 400;
+            font-size: 10px;
+            opacity: 0.8;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .header-actions select {
+            background: rgba(255, 255, 255, 0.18);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 30px;
+            padding: 4px 12px;
             font-size: 12px;
-            color: #475569;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            direction: rtl;
+            backdrop-filter: blur(4px);
+        }
+        .header-actions select option {
+            background: var(--dark);
+            color: white;
+        }
+        .header-actions button {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .header-actions button:active {
+            transform: scale(0.95);
+        }
+        .header-actions #adminBtn {
+            background: #fbbf24;
+            color: var(--dark);
+            display: none;
+        }
+        .header-actions #adminBtn.visible {
+            display: inline-block;
+        }
+        .sync-status {
+            font-size: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 2px 10px;
+            border-radius: 30px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #cbd5e1;
+            gap: 4px;
         }
-        .status-bar .online {
-            color: #22c55e;
+        .sync-status .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
         }
-        .status-bar .offline {
-            color: #ef4444;
+        .sync-status .dot.online {
+            background: #4ade80;
         }
-        .content {
+        .sync-status .dot.offline {
+            background: #f87171;
+        }
+
+        .tab-bar {
+            display: flex;
             background: white;
-            padding: 16px;
-            min-height: 60vh;
-            border-radius: 0 0 16px 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border-top: 1px solid #e2e8f0;
+            position: sticky;
+            bottom: 0;
+            z-index: 15;
+            flex-shrink: 0;
         }
-        .card {
-            background: #f8fafc;
-            border-right: 4px solid #1a73e8;
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 6px 2px 4px;
+            font-size: 9px;
+            color: #94a3b8;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: 0.2s;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            position: relative;
+        }
+        .tab .tab-icon {
+            font-size: 18px;
+        }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: var(--primary-light);
+        }
+        .badge {
+            position: absolute;
+            top: 0px;
+            right: 4px;
+            background: var(--danger);
+            color: white;
+            border-radius: 30px;
+            padding: 0px 5px;
+            font-size: 9px;
+            font-weight: 700;
+            display: none;
+            min-width: 16px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
             padding: 12px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        /* البطاقات */
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 12px 14px;
             margin-bottom: 8px;
-            border-radius: 8px;
+            box-shadow: var(--shadow);
+            border-right: 4px solid var(--primary);
+            transition: 0.15s;
+            cursor: default;
+        }
+        .card.clickable {
+            cursor: pointer;
+        }
+        .card.clickable:active {
+            transform: scale(0.98);
         }
         .card .title {
             font-weight: 700;
+            font-size: 15px;
         }
+        .card .sub {
+            color: var(--gray);
+            font-size: 12px;
+        }
+        .card .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            margin-top: 4px;
+            font-size: 12px;
+        }
+        .card .actions {
+            margin-top: 6px;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .card .urgent-badge {
+            background: var(--danger);
+            color: white;
+            padding: 1px 8px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .card .done-badge {
+            background: var(--success);
+            color: white;
+            padding: 1px 8px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .status-badge.admitted {
+            background: #dbeafe;
+            color: #1a56db;
+        }
+        .status-badge.discharged {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.waiting {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge.completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 600;
+            background: #e2e8f0;
+        }
+        .tag.high {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .tag.medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .tag.low {
+            background: #dbeafe;
+            color: #1a56db;
+        }
+
         button {
-            background: #1a73e8;
+            background: var(--primary);
             color: white;
             border: none;
-            padding: 8px 16px;
             border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
+            transition: 0.15s;
+            touch-action: manipulation;
         }
         button:active {
             transform: scale(0.96);
         }
         button.secondary {
-            background: #e2e8f0;
-            color: #1e293b;
+            background: var(--primary-light);
+            color: var(--primary);
         }
+        button.danger {
+            background: var(--danger);
+            color: white;
+        }
+        button.small {
+            padding: 3px 10px;
+            font-size: 10px;
+        }
+        button.block {
+            width: 100%;
+            justify-content: center;
+            margin: 3px 0;
+        }
+        button.gold {
+            background: #fbbf24;
+            color: var(--dark);
+        }
+
+        input,
+        textarea,
+        select.form-input {
+            width: 100%;
+            padding: 8px 12px;
+            margin: 3px 0 8px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            background: #f8fafc;
+            outline: none;
+            font-family: inherit;
+            direction: rtl;
+        }
+        input:focus,
+        textarea:focus,
+        select.form-input:focus {
+            border-color: var(--primary);
+            background: white;
+        }
+        textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            display: block;
+            margin-top: 4px;
+        }
+        .check-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 400;
+            font-size: 13px;
+            cursor: pointer;
+            margin: 3px 0;
+        }
+        .check-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .form-row .full {
+            grid-column: 1 / -1;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 12px;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 16px 18px;
+            width: 100%;
+            max-width: 440px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+        .modal-content h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        .modal-content h3 {
+            font-size: 15px;
+            margin: 10px 0 4px;
+            color: #475569;
+        }
+        .hidden {
+            display: none !important;
+        }
+
+        .snapshot-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 10px;
+            gap: 2px;
+        }
+        .snapshot-tab {
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: 0.15s;
+            border-radius: 6px 6px 0 0;
+        }
+        .snapshot-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px 16px;
+            color: var(--gray);
+        }
+        .empty-state .emoji {
+            font-size: 32px;
+        }
+        .empty-state p {
+            font-size: 13px;
+        }
+
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .text-muted {
+            color: var(--gray);
+            font-size: 11px;
+        }
+        .text-sm {
+            font-size: 12px;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+
         .toast {
             position: fixed;
-            bottom: 20px;
+            bottom: 80px;
             left: 50%;
             transform: translateX(-50%);
-            background: #1e293b;
+            background: var(--dark);
             color: white;
-            padding: 10px 24px;
+            padding: 8px 20px;
             border-radius: 30px;
-            font-size: 14px;
-            z-index: 999;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 200;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            max-width: 90%;
+            text-align: center;
+            animation: slideUp 0.3s ease;
         }
-        .flex {
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .chart-wrap {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 8px;
+            margin: 6px 0;
+            text-align: center;
+        }
+        .chart-wrap canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .role-tag {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 30px;
+            font-size: 9px;
+            font-weight: 600;
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+        .member-list {
             display: flex;
-            gap: 8px;
             flex-wrap: wrap;
-            margin: 8px 0;
-        }
-        input,
-        textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
+            gap: 4px;
             margin: 4px 0;
-            font-family: inherit;
+        }
+        .member-list .member {
+            background: var(--primary-light);
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .member-list .member .remove {
+            color: var(--danger);
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        /* رسائل الفريق */
+        .message {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            border-right: 3px solid #8b5cf6;
+        }
+        .message .sender {
+            font-weight: 700;
+            font-size: 12px;
+        }
+        .message .time {
+            color: var(--gray);
+            font-size: 10px;
+        }
+        .message .text {
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        /* تنسيق المهام */
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .task-item .task-info {
+            flex: 1;
+        }
+        .task-item .task-info .task-text {
+            font-size: 13px;
+        }
+        .task-item .task-info .task-meta {
+            font-size: 10px;
+            color: var(--gray);
         }
     </style>
 </head>
 <body>
 
-    <div id="app">
-        <div class="header">
-            <span style="font-size:20px;font-weight:800;">🏥 PaedsWard</span>
-            <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:30px;">حقيقي + ذكي</span>
-        </div>
+    <!-- ============================================================
+    التطبيق
+    ============================================================ -->
+    <div class="app" id="app">
+        <!-- Header -->
+        <header>
+            <div class="brand">🏥 PaedsWard <small>· منظم اليوم</small></div>
+            <div class="header-actions">
+                <select id="roleSelect" onchange="switchRole(this.value)">
+                    <option value="senior">👨‍⚕️ استشاري</option>
+                    <option value="junior">🧑‍⚕️ مبتدئ</option>
+                    <option value="nurse">👩‍⚕️ ممرض</option>
+                    <option value="admin">📋 إداري</option>
+                </select>
+                <button id="adminBtn" onclick="openAdminPanel()">🔑</button>
+                <span class="sync-status" id="syncStatus">
+                    <span class="dot offline" id="syncDot"></span>
+                    <span id="syncLabel">محلي</span>
+                </span>
+            </div>
+        </header>
 
-        <div class="status-bar">
-            <span id="statusText">⏳ جاري التحميل...</span>
-            <span>
-                <span id="syncIndicator" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
-                <span id="syncLabel" style="font-size:11px;">محلي</span>
-            </span>
-        </div>
+        <!-- Content -->
+        <div class="content" id="content"></div>
 
-        <div class="content" id="content">
-            <p>جاري تحميل البيانات...</p>
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab active" data-tab="ward" onclick="showTab('ward')">
+                <span class="tab-icon">🏥</span><span>الجناح</span>
+            </div>
+            <div class="tab" data-tab="clinic" onclick="showTab('clinic')">
+                <span class="tab-icon">🩺</span><span>العيادة</span>
+            </div>
+            <div class="tab" data-tab="tasks" onclick="showTab('tasks')">
+                <span class="tab-icon">📋</span><span>المهام</span>
+                <span class="badge" id="taskBadge">0</span>
+            </div>
+            <div class="tab" data-tab="team" onclick="showTab('team')">
+                <span class="tab-icon">👥</span><span>الفريق</span>
+                <span class="badge" id="teamBadge">0</span>
+            </div>
+            <div class="tab" data-tab="handover" onclick="showTab('handover')">
+                <span class="tab-icon">📝</span><span>التسليم</span>
+                <span class="badge" id="handoverBadge">0</span>
+            </div>
         </div>
+    </div>
 
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-            <button onclick="syncNow()">🔄 مزامنة الآن</button>
-            <button class="secondary" onclick="addDemoPatient()">➕ إضافة مريض تجريبي</button>
-            <button class="secondary" onclick="exportData()">📤 تصدير</button>
-            <button class="secondary" onclick="document.getElementById('importFile').click()">📥 استيراد</button>
-            <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-        </div>
+    <!-- Modal -->
+    <div id="modal" class="modal hidden" onclick="closeModalOverlay(event)">
+        <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
     </div>
 
     <script>
         // ============================================================
-        //  1. إعداد IndexedDB (تخزين محلي قوي، لا يستهلك RAM)
+        //  🚀 التطبيق الكامل – Offline-First PWA
         // ============================================================
-        const store = localforage.createInstance({ name: 'PaedsWard', storeName: 'state' });
 
-        let state = { patients: [], tasks: [], handovers: [], clinicSlots: [], teamMessages: [] };
+        // ─── الحالة (State) ───
+        let state = {
+            patients: [],
+            tasks: [],
+            handovers: [],
+            clinicSlots: [],
+            teamMembers: [
+                { id: 'u1', name: 'د. أحمد', role: 'senior' },
+                { id: 'u2', name: 'د. سارة', role: 'junior' },
+                { id: 'u3', name: 'م. ليلى', role: 'nurse' }
+            ],
+            teamMessages: [],
+            currentRole: 'senior',
+            lastSync: Date.now()
+        };
+
+        let currentTab = 'ward';
+        let selectedPatient = null;
+        let snapshotTab = 'overview';
         let isSyncing = false;
-        let retryTimeout = null;
+        let retryTimer = null;
 
-        // ============================================================
-        //  2. دوال مساعدة
-        // ============================================================
+        // ─── تحميل وحفظ البيانات ───
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('paedsward_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                    return true;
+                }
+            } catch (e) { console.warn('⚠️ فشل التحميل:', e); }
+            return false;
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('paedsward_state', JSON.stringify(state));
+                // محاولة المزامنة مع الخادم
+                syncToServer();
+            } catch (e) { console.warn('⚠️ فشل الحفظ:', e); }
+        }
+
+        // ─── المزامنة مع الخادم (Render) ───
+        async function syncToServer() {
+            if (isSyncing) return;
+            try {
+                const resp = await fetch('/api/state');
+                if (resp.ok) {
+                    const serverData = await resp.json();
+                    // دمج البيانات: إذا كانت بيانات الخادم أحدث
+                    if (serverData.lastSync && serverData.lastSync > state.lastSync) {
+                        // دمج آمن
+                        for (const key of ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMembers', 'teamMessages']) {
+                            if (serverData[key]) {
+                                state[key] = serverData[key];
+                            }
+                        }
+                        state.lastSync = serverData.lastSync || Date.now();
+                        saveState();
+                        render();
+                        updateSyncStatus(true);
+                        showToast('🔄 تم التحديث من الخادم');
+                    }
+                }
+                // رفع التغييرات المحلية
+                await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...state, lastSync: Date.now() })
+                });
+                updateSyncStatus(true);
+            } catch (e) {
+                updateSyncStatus(false);
+                console.warn('⚠️ الخادم غير متاح:', e.message);
+                // إعادة المحاولة بعد 30 ثانية
+                if (retryTimer) clearTimeout(retryTimer);
+                retryTimer = setTimeout(syncToServer, 30000);
+            }
+        }
+
+        function updateSyncStatus(online) {
+            const dot = document.getElementById('syncDot');
+            const label = document.getElementById('syncLabel');
+            if (online) {
+                dot.className = 'dot online';
+                label.textContent = 'متصل';
+            } else {
+                dot.className = 'dot offline';
+                label.textContent = 'محلي';
+            }
+        }
+
+        // ─── مزامنة فورية مع الخادم عند كل تغيير ───
+        let syncDebounce = null;
+
+        function syncDelayed() {
+            if (syncDebounce) clearTimeout(syncDebounce);
+            syncDebounce = setTimeout(() => {
+                syncToServer();
+                syncDebounce = null;
+            }, 3000);
+        }
+
+        // ─── أدوات مساعدة ───
         function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
         function today() { return new Date().toISOString().split('T')[0]; }
 
-        function showToast(msg, isError = false) {
+        function timeNow() { return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); }
+
+        function getRoleLabel(role) {
+            const map = { senior: 'استشاري', junior: 'مبتدئ', nurse: 'ممرض', admin: 'إداري' };
+            return map[role] || role;
+        }
+
+        function getRoleEmoji(role) {
+            const map = { senior: '👨‍⚕️', junior: '🧑‍⚕️', nurse: '👩‍⚕️', admin: '📋' };
+            return map[role] || '👤';
+        }
+
+        function can(roles) { return roles.includes(state.currentRole); }
+
+        function showToast(msg) {
             const old = document.querySelector('.toast');
             if (old) old.remove();
             const el = document.createElement('div');
             el.className = 'toast';
             el.textContent = msg;
-            if (isError) el.style.background = '#ef4444';
             document.body.appendChild(el);
             setTimeout(() => { el.style.opacity = '0';
-                setTimeout(() => el.remove(), 300); }, 3000);
+                setTimeout(() => el.remove(), 300); }, 2500);
         }
 
-        function updateStatus(text, isOnline) {
-            document.getElementById('statusText').textContent = text;
-            const dot = document.getElementById('syncIndicator');
-            const label = document.getElementById('syncLabel');
-            if (isOnline) {
-                dot.style.background = '#22c55e';
-                label.textContent = 'متصل';
-            } else {
-                dot.style.background = '#f59e0b';
-                label.textContent = 'محلي (غير متصل)';
-            }
+        function openModal(html) {
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modalContent').innerHTML = html;
         }
 
-        // ============================================================
-        //  3. تحميل البيانات محلياً (فوري)
-        // ============================================================
-        async function loadLocalState() {
-            try {
-                const saved = await store.getItem('state');
-                if (saved) {
-                    state = saved;
-                    render();
-                    updateStatus(`📱 محلي (آخر تحديث: ${new Date().toLocaleTimeString()})`, false);
-                } else {
-                    // بيانات افتراضية للمرة الأولى
-                    state = {
-                        patients: [
-                            { id: 'p1', name: 'نور الهاشمي', age: 3, weight: 14, bed: 'PICU-2', diagnosis: 'التهاب القصيبات',
-                                status: 'نشط', vitals: 'T:37.8', fluids: '', meds: '', notes: '', admissionDate: today(),
-                                dischargeDate: null, updatedAt: Date.now() }
-                        ],
-                        tasks: [
-                            { id: 't1', text: 'مراجعة نتائج نور', priority: 'عالية', assignee: 'senior', done: false,
-                                createdAt: today(), updatedAt: Date.now() }
-                        ],
-                        handovers: [],
-                        clinicSlots: [],
-                        teamMessages: []
-                    };
-                    await store.setItem('state', state);
-                    render();
-                    updateStatus('📱 بيانات افتراضية', false);
-                }
-            } catch (e) {
-                console.error('فشل تحميل المحلي:', e);
-                updateStatus('⚠️ خطأ في التحميل', false);
-            }
-            // بدء التحديث الخلفي
-            setTimeout(syncInBackground, 500);
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+        function closeModalOverlay(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+
+        // ─── تحديث الشارات ───
+        function updateBadges() {
+            const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole ===
+                'senior')).length;
+            const tb = document.getElementById('taskBadge');
+            tb.style.display = pending ? 'block' : 'none';
+            tb.textContent = pending;
+
+            const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
+            const hb = document.getElementById('handoverBadge');
+            hb.style.display = urgent ? 'block' : 'none';
+            hb.textContent = urgent;
+
+            const unread = state.teamMessages.filter(m => !m.read).length;
+            const mb = document.getElementById('teamBadge');
+            mb.style.display = unread ? 'block' : 'none';
+            mb.textContent = unread;
         }
 
-        // ============================================================
-        //  4. التحديث الخلفي (Background Sync مع إعادة محاولة ذكية)
-        // ============================================================
-        async function syncInBackground() {
-            if (isSyncing) return;
-            isSyncing = true;
-            updateStatus('🔄 جاري المزامنة...', false);
-
-            try {
-                const response = await fetch('/api/state');
-                if (!response.ok) throw new Error('Server not reachable');
-
-                const remote = await response.json();
-                let changed = false;
-
-                // دمج البيانات (الأحدث يحل محل القديم)
-                for (const key of ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMessages']) {
-                    if (remote[key] && remote[key].length > 0) {
-                        // مقارنة بسيطة: إذا كان الطول مختلفاً أو التوقيت أحدث
-                        if (remote[key].length !== state[key].length) {
-                            state[key] = remote[key];
-                            changed = true;
-                        } else {
-                            // تحقق من وجود تحديثات (باستخدام updatedAt)
-                            const localLatest = state[key].reduce((max, item) => item.updatedAt > max ? item.updatedAt : max,
-                            0);
-                            const remoteLatest = remote[key].reduce((max, item) => item.updatedAt > max ? item.updatedAt :
-                                max, 0);
-                            if (remoteLatest > localLatest) {
-                                state[key] = remote[key];
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-
-                if (changed) {
-                    await store.setItem('state', state);
-                    render();
-                    showToast('✅ تم تحديث البيانات من الخادم');
-                }
-
-                updateStatus(`✅ متزامن (${new Date().toLocaleTimeString()})`, true);
-
-            } catch (error) {
-                console.warn('⚠️ الخادم غير متاح (نائم أو غير متصل):', error.message);
-                updateStatus('⚠️ وضع غير متصل (بيانات محلية)', false);
-                // إعادة المحاولة بعد 30 ثانية (آلية ذكية)
-                if (retryTimeout) clearTimeout(retryTimeout);
-                retryTimeout = setTimeout(syncInBackground, 30000);
-            } finally {
-                isSyncing = false;
-            }
-        }
-
-        // ============================================================
-        //  5. حفظ التغييرات (محلياً + رفع للخادم في الخلفية)
-        // ============================================================
-        async function saveAndSync(collection, newData) {
-            // تحديث الحالة المحلية
-            state[collection] = newData;
-            // إضافة updatedAt لكل عنصر
-            state[collection] = state[collection].map(item => ({ ...item, updatedAt: Date.now() }));
-
-            // حفظ في IndexedDB فوراً (الواجهة تتغير بسرعة)
-            await store.setItem('state', state);
+        // ─── تبديل الدور ───
+        function switchRole(role) {
+            state.currentRole = role;
+            saveState();
+            document.getElementById('roleSelect').value = role;
+            const adminBtn = document.getElementById('adminBtn');
+            adminBtn.classList.toggle('visible', role === 'senior');
             render();
-            showToast('💾 تم الحفظ محلياً');
-
-            // محاولة رفع التغيير للخادم في الخلفية
-            try {
-                const response = await fetch(`/api/sync/${collection}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(state[collection])
-                });
-                if (!response.ok) throw new Error('فشل الرفع');
-                showToast('☁️ تم رفع البيانات للخادم');
-                // بعد رفع ناجح، نحدث حالة المزامنة
-                updateStatus(`✅ متزامن (${new Date().toLocaleTimeString()})`, true);
-            } catch (e) {
-                console.warn('⚠️ الخادم غير متاح، البيانات محفوظة محلياً. سيتم إعادة المحاولة...');
-                // جدولة إعادة محاولة بعد دقيقة
-                if (retryTimeout) clearTimeout(retryTimeout);
-                retryTimeout = setTimeout(syncInBackground, 60000);
-            }
         }
 
-        // ============================================================
-        //  6. دوال التصيير (Render)
-        // ============================================================
+        // ─── التبديل بين الأقسام ───
+        function showTab(tab) {
+            currentTab = tab;
+            render();
+        }
+
+        // ─── التصيير الرئيسي ───
         function render() {
+            updateBadges();
             const container = document.getElementById('content');
+            container.innerHTML = '';
+
+            switch (currentTab) {
+                case 'ward':
+                    renderWard(container);
+                    break;
+                case 'clinic':
+                    renderClinic(container);
+                    break;
+                case 'tasks':
+                    renderTasks(container);
+                    break;
+                case 'team':
+                    renderTeam(container);
+                    break;
+                case 'handover':
+                    renderHandover(container);
+                    break;
+            }
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            const active = document.querySelector(`.tab[data-tab="${currentTab}"]`);
+            if (active) active.classList.add('active');
+
+            // تحديث زر الإدارة
+            const adminBtn = document.getElementById('adminBtn');
+            adminBtn.classList.toggle('visible', state.currentRole === 'senior');
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  1. الجناح (Ward)
+        // ════════════════════════════════════════════════════════════════
+
+        function renderWard(container) {
+            const active = state.patients.filter(p => p.status !== 'discharged');
+            const discharged = state.patients.filter(p => p.status === 'discharged');
+
             let html = `
-                <div style="margin-bottom:12px;">
-                    <span style="font-weight:700;">👥 المرضى:</span> ${state.patients.length}
-                    <span style="margin-right:12px;font-weight:700;">📋 المهام:</span> ${state.tasks.filter(t=>!t.done).length}
+                <div class="flex-between mb-8">
+                    <h2 style="font-size:18px;">🏥 الجناح</h2>
+                    ${can(['senior','junior']) ? `<button class="small" onclick="showAdmissionForm()">➕ قبول</button>` : ''}
                 </div>
-                <h3 style="margin:12px 0 8px;">🩺 قائمة المرضى</h3>
+                <div class="text-muted text-sm">👥 ${active.length} مريض نشط · ${discharged.length} مكتمل</div>
             `;
 
-            if (state.patients.length === 0) {
-                html += `<p style="color:#94a3b8;">لا يوجد مرضى</p>`;
+            if (!active.length) {
+                html += `<div class="empty-state"><div class="emoji">🛏️</div><p>لا يوجد مرضى نشطين</p></div>`;
             } else {
-                state.patients.forEach(p => {
+                active.forEach(p => {
                     html += `
-                        <div class="card">
-                            <div class="title">${p.name} <span style="font-weight:400;font-size:14px;color:#64748b;">(${p.age} سنة)</span></div>
-                            <div style="font-size:13px;color:#475569;">${p.diagnosis} · سرير ${p.bed}</div>
-                            <div style="font-size:12px;color:#94a3b8;">${p.vitals || 'لا توجد فحوصات'}</div>
-                            <div style="margin-top:4px;">
-                                <button class="secondary" style="font-size:11px;padding:2px 10px;" onclick="updateVitals('${p.id}')">📊 فحوصات</button>
-                                <button class="secondary" style="font-size:11px;padding:2px 10px;" onclick="addNote('${p.id}')">📝 ملاحظة</button>
+                        <div class="card clickable" onclick="viewPatientSnapshot('${p.id}')">
+                            <div class="flex-between">
+                                <div>
+                                    <div class="title">${p.name} <span class="text-muted text-sm">(${p.age}س)</span></div>
+                                    <div class="sub">${p.diagnosis} · سرير ${p.bed}</div>
+                                </div>
+                                <span class="status-badge admitted">نشط</span>
                             </div>
+                            <div class="meta">
+                                <span>⚖️ ${p.weight}كجم</span>
+                                <span>🩺 ${p.vitals || '—'}</span>
+                            </div>
+                            <div class="actions">
+                                ${can(['nurse','senior']) ? `<button class="small secondary" onclick="event.stopPropagation();updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
+                                ${can(['junior','senior']) ? `<button class="small secondary" onclick="event.stopPropagation();addNote('${p.id}')">📝 ملاحظة</button>` : ''}
+                                ${can(['senior']) ? `<button class="small danger" onclick="event.stopPropagation();dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            if (discharged.length) {
+                html += `<details style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ مكتمل (${discharged.length})</summary>`;
+                discharged.forEach(p => {
+                    html += `
+                        <div class="card" style="border-right-color:var(--gray);opacity:0.6;">
+                            <div class="flex-between">
+                                <span class="title" style="font-size:13px;">${p.name}</span>
+                                <span class="status-badge discharged">مكتمل</span>
+                            </div>
+                            <div class="sub">${p.diagnosis} · ${p.age}س</div>
+                        </div>
+                    `;
+                });
+                html += `</details>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // ─── نموذج القبول ───
+        function showAdmissionForm() {
+            openModal(`
+                <h2>➕ قبول مريض جديد</h2>
+                <label>الاسم *</label><input id="admName" placeholder="مثال: نور الهاشمي">
+                <div class="form-row">
+                    <div><label>العمر (سنة) *</label><input id="admAge" type="number" placeholder="3"></div>
+                    <div><label>الوزن (كجم) *</label><input id="admWeight" type="number" step="0.1" placeholder="14"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>الطول (سم)</label><input id="admHeight" type="number" step="0.1" placeholder="95"></div>
+                    <div><label>السرير *</label><input id="admBed" placeholder="مثال: PICU-2"></div>
+                </div>
+                <label>التشخيص *</label><input id="admDiagnosis" placeholder="مثال: التهاب القصيبات">
+                <label>مصدر الدخول</label>
+                <select id="admSource" class="form-input">
+                    <option value="ER">الطوارئ</option>
+                    <option value="OPD">العيادة</option>
+                    <option value="Transfer">تحويل</option>
+                </select>
+                <label>التاريخ المرضي والفحص</label>
+                <textarea id="admHistory" placeholder="الملاحظات السريرية..."></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <button onclick="admitPatient()">قبول</button>
+                    <button class="secondary" onclick="closeModal()">إلغاء</button>
+                </div>
+            `);
+        }
+
+        function admitPatient() {
+            const name = document.getElementById('admName').value.trim();
+            const age = parseFloat(document.getElementById('admAge').value);
+            const weight = parseFloat(document.getElementById('admWeight').value);
+            const height = parseFloat(document.getElementById('admHeight').value) || null;
+            const bed = document.getElementById('admBed').value.trim();
+            const diagnosis = document.getElementById('admDiagnosis').value.trim();
+            const source = document.getElementById('admSource').value;
+            const history = document.getElementById('admHistory').value.trim();
+
+            if (!name || isNaN(age) || age <= 0 || isNaN(weight) || weight <= 0 || !bed || !diagnosis) {
+                alert('⚠️ جميع الحقول المطلوبة (*) يجب تعبئتها');
+                return;
+            }
+
+            const id = 'p' + uid();
+            state.patients.push({
+                id,
+                name,
+                age,
+                weight,
+                height,
+                bed,
+                diagnosis,
+                status: 'admitted',
+                vitals: '',
+                fluids: '',
+                meds: '',
+                notes: history || '',
+                admissionDate: today(),
+                dischargeDate: null,
+                source,
+                dischargeChecklist: { summary: false, meds: false, followUp: false },
+                updatedAt: Date.now()
+            });
+
+            state.tasks.push({
+                id: 't' + uid(),
+                text: `تقييم كامل لـ ${name}`,
+                priority: 'high',
+                assignee: 'junior',
+                done: false,
+                createdAt: today(),
+                updatedAt: Date.now()
+            });
+
+            saveState();
+            syncDelayed();
+            closeModal();
+            render();
+            showToast(`✅ تم قبول ${name}`);
+        }
+
+        // ─── تحديث الفحوصات ───
+        function updateVitals(id) {
+            const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
+            if (val === null) return;
+            const p = state.patients.find(p => p.id === id);
+            if (p) {
+                p.vitals = val;
+                p.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                render();
+                showToast('✅ تم تحديث الفحوصات');
+            }
+        }
+
+        // ─── إضافة ملاحظة ───
+        function addNote(id) {
+            const note = prompt('أضف ملاحظة سريرية:');
+            if (!note) return;
+            const p = state.patients.find(p => p.id === id);
+            if (p) {
+                p.notes = (p.notes || '') + '\n' + today() + ' ' + timeNow() + ': ' + note;
+                p.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                render();
+                showToast('📝 تم إضافة الملاحظة');
+            }
+        }
+
+        // ─── إنهاء حالة المريض ───
+        function dischargePatient(id) {
+            if (!confirm('هل أنت متأكد من إنهاء حالة هذا المريض؟')) return;
+            const p = state.patients.find(p => p.id === id);
+            if (p) {
+                p.status = 'discharged';
+                p.dischargeDate = today();
+                p.updatedAt = Date.now();
+                state.tasks.push({
+                    id: 't' + uid(),
+                    text: `ملخص خروج ${p.name}`,
+                    priority: 'medium',
+                    assignee: 'junior',
+                    done: true,
+                    createdAt: today(),
+                    updatedAt: Date.now()
+                });
+                saveState();
+                syncDelayed();
+                render();
+                showToast(`⬆️ تم خروج ${p.name}`);
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  2. اللقطة الشاملة للمريض (Snapshot)
+        // ════════════════════════════════════════════════════════════════
+
+        function viewPatientSnapshot(id) {
+            const p = state.patients.find(p => p.id === id);
+            if (!p) return;
+            selectedPatient = p;
+            snapshotTab = 'overview';
+
+            const tabs = [
+                { id: 'overview', label: 'نظرة عامة' },
+                { id: 'vitals', label: 'فحوصات' },
+                { id: 'growth', label: 'نمو' },
+                { id: 'meds', label: 'أدوية' },
+                { id: 'notes', label: 'ملاحظات' },
+                { id: 'discharge', label: 'تخريج' }
+            ];
+
+            let tabHtml = tabs.map((t, i) =>
+                `<div class="snapshot-tab ${i===0?'active':''}" data-stab="${t.id}" onclick="switchSnapshotTab('${t.id}')">${t.label}</div>`
+            ).join('');
+
+            openModal(`
+                <h2>${p.name} <span class="text-muted text-sm">${p.age}س · ${p.weight}كجم</span></h2>
+                <div class="snapshot-tabs">${tabHtml}</div>
+                <div id="snapshotContent"></div>
+                <button class="block secondary" style="margin-top:10px;" onclick="closeModal()">إغلاق</button>
+            `);
+
+            renderSnapshotTab('overview');
+        }
+
+        function switchSnapshotTab(tab) {
+            snapshotTab = tab;
+            document.querySelectorAll('.snapshot-tab').forEach(el => {
+                el.classList.toggle('active', el.dataset.stab === tab);
+            });
+            renderSnapshotTab(tab);
+        }
+
+        function renderSnapshotTab(tab) {
+            const p = selectedPatient;
+            if (!p) return;
+            const container = document.getElementById('snapshotContent');
+            if (!container) return;
+
+            switch (tab) {
+                case 'overview':
+                    container.innerHTML = `
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0;">
+                            <div><b>التشخيص</b><br>${p.diagnosis}</div>
+                            <div><b>السرير</b><br>${p.bed}</div>
+                            <div><b>الفحوصات</b><br>${p.vitals || '—'}</div>
+                            <div><b>السوائل</b><br>${p.fluids || '—'}</div>
+                            <div><b>الأدوية</b><br>${p.meds || '—'}</div>
+                            <div><b>تاريخ القبول</b><br>${p.admissionDate || '—'}</div>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+                            <button class="small secondary" onclick="calcIVFluids()">💧 السوائل</button>
+                            <button class="small secondary" onclick="calcEmergencyDrugs()">💊 الطوارئ</button>
+                            <button class="small secondary" onclick="calcBilirubin()">🧪 الصفار</button>
+                        </div>
+                    `;
+                    break;
+
+                case 'vitals':
+                    container.innerHTML = `
+                        <div style="margin:6px 0;">
+                            <div><b>الفحوصات الحالية:</b> ${p.vitals || 'لا توجد'}</div>
+                            ${can(['nurse','senior']) ? `<button class="small" onclick="updateVitals('${p.id}');closeModal();">➕ تحديث</button>` : ''}
+                        </div>
+                        <div class="chart-wrap">
+                            <canvas id="vitalsChart" width="320" height="120"></canvas>
+                        </div>
+                    `;
+                    setTimeout(drawVitalsChart, 50);
+                    break;
+
+                case 'growth':
+                    container.innerHTML = `
+                        <div class="chart-wrap">
+                            <canvas id="growthChart" width="320" height="160"></canvas>
+                        </div>
+                        <div class="text-muted text-sm">⚖️ ${p.weight}كجم · 📏 ${p.height||'—'}سم · 🧑 ${p.age}سنة</div>
+                    `;
+                    setTimeout(drawGrowthChart, 50);
+                    break;
+
+                case 'meds':
+                    container.innerHTML = `
+                        <label>الأدوية الحالية</label>
+                        <textarea id="snapshotMeds">${p.meds || ''}</textarea>
+                        <button onclick="saveSnapshotMeds()">💾 حفظ</button>
+                    `;
+                    break;
+
+                case 'notes':
+                    container.innerHTML = `
+                        <label>الملاحظات السريرية</label>
+                        <textarea id="snapshotNotes">${p.notes || ''}</textarea>
+                        <button onclick="saveSnapshotNotes()">💾 حفظ</button>
+                    `;
+                    break;
+
+                case 'discharge':
+                    const c = p.dischargeChecklist || {};
+                    container.innerHTML = `
+                        <h3 style="font-size:15px;margin:0 0 8px 0;">📋 قائمة التخريج</h3>
+                        <label class="check-label"><input type="checkbox" id="dcSummary" ${c.summary?'checked':''}> تم إعداد الملخص</label>
+                        <label class="check-label"><input type="checkbox" id="dcMeds" ${c.meds?'checked':''}> تم شرح الأدوية</label>
+                        <label class="check-label"><input type="checkbox" id="dcFollow" ${c.followUp?'checked':''}> تم تحديد المتابعة</label>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="small" onclick="saveDischargeChecklist()">💾 حفظ</button>
+                            ${can(['senior']) ? `<button class="small danger" onclick="signDischarge()">✍️ توقيع الخروج</button>` : ''}
+                        </div>
+                    `;
+                    break;
+            }
+        }
+
+        // ─── حفظ الأدوية ───
+        function saveSnapshotMeds() {
+            const val = document.getElementById('snapshotMeds').value;
+            selectedPatient.meds = val;
+            const p = state.patients.find(p => p.id === selectedPatient.id);
+            if (p) p.meds = val;
+            saveState();
+            syncDelayed();
+            showToast('✅ تم حفظ الأدوية');
+        }
+
+        // ─── حفظ الملاحظات ───
+        function saveSnapshotNotes() {
+            const val = document.getElementById('snapshotNotes').value;
+            selectedPatient.notes = val;
+            const p = state.patients.find(p => p.id === selectedPatient.id);
+            if (p) p.notes = val;
+            saveState();
+            syncDelayed();
+            showToast('✅ تم حفظ الملاحظات');
+        }
+
+        // ─── حفظ قائمة التخريج ───
+        function saveDischargeChecklist() {
+            const c = {
+                summary: document.getElementById('dcSummary').checked,
+                meds: document.getElementById('dcMeds').checked,
+                followUp: document.getElementById('dcFollow').checked
+            };
+            selectedPatient.dischargeChecklist = c;
+            const p = state.patients.find(p => p.id === selectedPatient.id);
+            if (p) p.dischargeChecklist = c;
+            saveState();
+            syncDelayed();
+            showToast('✅ تم حفظ قائمة التخريج');
+        }
+
+        // ─── توقيع الخروج ───
+        function signDischarge() {
+            if (!confirm(`تأكيد خروج ${selectedPatient.name}؟`)) return;
+            selectedPatient.status = 'discharged';
+            selectedPatient.dischargeDate = today();
+            const p = state.patients.find(p => p.id === selectedPatient.id);
+            if (p) { p.status = 'discharged';
+                p.dischargeDate = today(); }
+            state.tasks.push({
+                id: 't' + uid(),
+                text: `ملخص خروج ${selectedPatient.name}`,
+                priority: 'medium',
+                assignee: 'junior',
+                done: true,
+                createdAt: today(),
+                updatedAt: Date.now()
+            });
+            saveState();
+            syncDelayed();
+            closeModal();
+            render();
+            showToast(`⬆️ تم خروج ${selectedPatient.name}`);
+        }
+
+        // ─── الرسوم البيانية ───
+        function drawVitalsChart() {
+            const canvas = document.getElementById('vitalsChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width,
+                H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+            const data = [88, 92, 85, 95, 90, 100, 88, 93];
+            const step = (W - 40) / (data.length - 1);
+            ctx.beginPath();
+            ctx.strokeStyle = '#1a73e8';
+            ctx.lineWidth = 2;
+            data.forEach((v, i) => {
+                const x = 20 + i * step;
+                const y = H - 10 - (v / 120) * (H - 20);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            data.forEach((v, i) => {
+                const x = 20 + i * step;
+                const y = H - 10 - (v / 120) * (H - 20);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#1a73e8';
+                ctx.fill();
+            });
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '9px system-ui';
+            ctx.fillText('مخطط الفحوصات (تمثيلي)', 10, 14);
+        }
+
+        function drawGrowthChart() {
+            const canvas = document.getElementById('growthChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width,
+                H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+            const p = selectedPatient;
+            const age = Math.min(p.age || 1, 18);
+            const weight = Math.min(p.weight || 5, 40);
+            // منحنيات مرجعية تمثيلية
+            [
+                [3, '#e2e8f0'],
+                [50, '#94a3b8'],
+                [97, '#e2e8f0']
+            ].forEach(r => {
+                ctx.beginPath();
+                ctx.strokeStyle = r[1];
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                for (let a = 0; a <= 18; a += 0.5) {
+                    const x = 30 + (a / 18) * (W - 60);
+                    const base = 3 + a * 2.2;
+                    const y = H - 20 - ((base * (r[0] / 100) + 1) / 45) * (H - 40);
+                    a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+            // نقطة المريض
+            const px = 30 + (age / 18) * (W - 60);
+            const py = H - 20 - ((weight) / 45) * (H - 40);
+            ctx.fillStyle = '#1a73e8';
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#1a73e8';
+            ctx.font = 'bold 10px system-ui';
+            ctx.fillText(`● ${p.name}`, px + 10, py + 3);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '9px system-ui';
+            ctx.fillText('مخطط النمو (تمثيلي)', 10, 14);
+        }
+
+        // ─── الحاسبات الطبية ───
+        function calcIVFluids() {
+            const p = selectedPatient;
+            if (!p) return alert('اختر مريضاً أولاً');
+            const w = p.weight || 10;
+            let vol;
+            if (w <= 10) vol = w * 100;
+            else if (w <= 20) vol = 1000 + (w - 10) * 50;
+            else vol = 1500 + (w - 20) * 20;
+            alert(`💧 السوائل الوريدية للمحافظة (${w} كجم)\n${vol} مل/يوم ≈ ${Math.round(vol/24)} مل/ساعة`);
+        }
+
+        function calcEmergencyDrugs() {
+            const p = selectedPatient;
+            if (!p) return alert('اختر مريضاً أولاً');
+            const w = p.weight || 10;
+            alert(`💊 الأدوية الطارئة (${w} كجم)\n` +
+                `أدرينالين 0.01 مغ/كجم = ${(w*0.01).toFixed(2)} مغ\n` +
+                `سالبوتامول بخاخ = ${w<20?'2.5':'5'} مغ\n` +
+                `ديازيبام 0.2 مغ/كجم = ${(w*0.2).toFixed(1)} مغ\n` +
+                `غلوكوز 10% 2 مل/كجم = ${(w*2).toFixed(0)} مل`);
+        }
+
+        function calcBilirubin() {
+            const age = prompt('العمر بالساعات (حديث الولادة):');
+            const bili = prompt('البيليروبين الكلي (ميكرومول/لتر):');
+            const gestation = prompt('عمر الحمل (أسابيع):');
+            if (!age || !bili || !gestation) return;
+            const bil = parseFloat(bili),
+                ga = parseInt(gestation);
+            if (isNaN(bil) || isNaN(ga)) return alert('أدخل أرقاماً صحيحة');
+            const threshold = ga < 38 ? 250 : 300;
+            if (bil > threshold) {
+                alert(`🧪 البيليروبين ${bil} > الحد ${threshold}. يُنصح بالعلاج الضوئي.`);
+            } else {
+                alert(`🧪 البيليروبين ${bil} ضمن الحدود الطبيعية (<${threshold}).`);
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  3. العيادة (Clinic)
+        // ════════════════════════════════════════════════════════════════
+
+        function renderClinic(container) {
+            let html = `
+                <div class="flex-between mb-8">
+                    <h2 style="font-size:18px;">🩺 العيادة</h2>
+                    ${can(['admin']) ? `<button class="small" onclick="addClinicSlot()">➕ إضافة</button>` : ''}
+                </div>
+            `;
+
+            if (!state.clinicSlots.length) {
+                html += `<div class="empty-state"><div class="emoji">📋</div><p>لا توجد مواعيد</p></div>`;
+            } else {
+                state.clinicSlots.forEach(s => {
+                    html += `
+                        <div class="card" style="border-right-color:${s.status === 'مكتمل' ? 'var(--success)' : 'var(--warning)'};">
+                            <div class="flex-between">
+                                <div>
+                                    <div class="title">${s.patientName}</div>
+                                    <div class="sub">⏰ ${s.time} · ${s.age} سنة · ${s.reason}</div>
+                                </div>
+                                <span class="status-badge ${s.status === 'مكتمل' ? 'completed' : 'waiting'}">${s.status}</span>
+                            </div>
+                            ${can(['admin']) ? `
+                                <div class="actions">
+                                    <button class="small secondary" onclick="updateClinicStatus('${s.id}','مكتمل')">✅ مكتمل</button>
+                                    <button class="small danger" onclick="removeClinicSlot('${s.id}')">🗑️</button>
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 });
@@ -337,126 +1404,428 @@
             container.innerHTML = html;
         }
 
-        // ============================================================
-        //  7. دوال التفاعل (Actions)
-        // ============================================================
-
-        // إضافة مريض تجريبي
-        window.addDemoPatient = function() {
-            const newPatient = {
-                id: 'p' + uid(),
-                name: 'مريض ' + (state.patients.length + 1),
-                age: Math.floor(Math.random() * 10) + 1,
-                weight: Math.floor(Math.random() * 20) + 5,
-                bed: 'WARD-' + (Math.floor(Math.random() * 10) + 1),
-                diagnosis: 'تشخيص تجريبي',
-                status: 'نشط',
-                vitals: 'T:36.8 HR:120',
-                fluids: '',
-                meds: '',
-                notes: 'تمت الإضافة تجريبياً',
-                admissionDate: today(),
-                dischargeDate: null,
+        function addClinicSlot() {
+            const time = prompt('الوقت (مثال: 10:30):');
+            const name = prompt('اسم المريض:');
+            const age = prompt('العمر:');
+            const reason = prompt('سبب الزيارة:');
+            if (!time || !name || !age || !reason) return;
+            state.clinicSlots.push({
+                id: 'c' + uid(),
+                time,
+                patientName: name,
+                age: parseInt(age),
+                reason,
+                status: 'انتظار',
                 updatedAt: Date.now()
-            };
-            state.patients.push(newPatient);
-            saveAndSync('patients', state.patients);
-            showToast(`✅ تم إضافة ${newPatient.name}`);
-        };
+            });
+            saveState();
+            syncDelayed();
+            render();
+            showToast('✅ تمت إضافة الموعد');
+        }
 
-        // تحديث الفحوصات
-        window.updateVitals = function(id) {
-            const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
-            if (val === null) return;
-            const p = state.patients.find(p => p.id === id);
-            if (p) {
-                p.vitals = val;
-                p.updatedAt = Date.now();
-                saveAndSync('patients', state.patients);
+        function updateClinicStatus(id, status) {
+            const s = state.clinicSlots.find(s => s.id === id);
+            if (s) { s.status = status;
+                s.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                render();
+                showToast('✅ تم تحديث الحالة'); }
+        }
+
+        function removeClinicSlot(id) {
+            if (!confirm('حذف الموعد؟')) return;
+            state.clinicSlots = state.clinicSlots.filter(s => s.id !== id);
+            saveState();
+            syncDelayed();
+            render();
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  4. المهام (Tasks)
+        // ════════════════════════════════════════════════════════════════
+
+        function renderTasks(container) {
+            let html = `
+                <div class="flex-between mb-8">
+                    <h2 style="font-size:18px;">📋 المهام</h2>
+                    ${can(['senior']) ? `<button class="small" onclick="addTask()">➕ إضافة</button>` : ''}
+                </div>
+            `;
+
+            const pending = state.tasks.filter(t => !t.done);
+            const done = state.tasks.filter(t => t.done);
+
+            if (!pending.length) {
+                html += `<div class="empty-state"><div class="emoji">✅</div><p>لا توجد مهام معلقة</p></div>`;
+            } else {
+                pending.forEach(t => {
+                    const isMine = t.assignee === state.currentRole || state.currentRole === 'senior';
+                    html += `
+                        <div class="card" style="border-right-color:${t.priority === 'high' ? 'var(--danger)' : t.priority === 'medium' ? 'var(--warning)' : 'var(--gray)'};">
+                            <div class="flex-between">
+                                <span class="title" style="font-size:14px;">${t.text}</span>
+                                <span class="tag ${t.priority}">${t.priority}</span>
+                            </div>
+                            <div class="sub">👤 ${getRoleLabel(t.assignee)} · ${t.createdAt || ''}</div>
+                            ${isMine ? `<div class="actions"><button class="small" onclick="toggleTask('${t.id}')">✅ إنجاز</button></div>` : ''}
+                        </div>
+                    `;
+                });
             }
-        };
 
-        // إضافة ملاحظة
-        window.addNote = function(id) {
-            const note = prompt('أضف ملاحظة:');
-            if (!note) return;
-            const p = state.patients.find(p => p.id === id);
-            if (p) {
-                p.notes = (p.notes || '') + '\n' + today() + ' ' + new Date().toLocaleTimeString() + ': ' + note;
-                p.updatedAt = Date.now();
-                saveAndSync('patients', state.patients);
+            if (done.length) {
+                html += `<details style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ منجزة (${done.length})</summary>`;
+                done.forEach(t => {
+                    html += `
+                        <div class="card" style="border-right-color:var(--success);opacity:0.5;">
+                            <div class="flex-between">
+                                <span style="font-size:13px;">${t.text}</span>
+                                <span class="done-badge">✓</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</details>`;
             }
-        };
 
-        // المزامنة اليدوية
-        window.syncNow = function() {
-            showToast('🔄 جاري المزامنة...');
-            syncInBackground();
-        };
+            container.innerHTML = html;
+        }
 
-        // تصدير البيانات (يدوي)
-        window.exportData = function() {
-            const data = JSON.stringify(state, null, 2);
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `PaedsWard_Backup_${today()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('📤 تم تصدير البيانات');
-        };
+        function addTask() {
+            const text = prompt('وصف المهمة:');
+            if (!text) return;
+            const assignee = prompt('المسؤول (senior/junior/nurse):') || 'junior';
+            const priority = prompt('الأولوية (high/medium/low):') || 'medium';
+            state.tasks.push({
+                id: 't' + uid(),
+                text,
+                priority: priority.toLowerCase(),
+                assignee: assignee.toLowerCase(),
+                done: false,
+                createdAt: today(),
+                updatedAt: Date.now()
+            });
+            saveState();
+            syncDelayed();
+            render();
+            showToast('📋 تمت إضافة المهمة');
+        }
 
-        // استيراد البيانات (يدوي)
-        window.importData = function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (data.patients) state.patients = data.patients;
-                    if (data.tasks) state.tasks = data.tasks;
-                    if (data.handovers) state.handovers = data.handovers;
-                    if (data.clinicSlots) state.clinicSlots = data.clinicSlots;
-                    if (data.teamMessages) state.teamMessages = data.teamMessages;
-                    // إضافة updatedAt للجميع
-                    state.patients = state.patients.map(p => ({ ...p, updatedAt: Date.now() }));
-                    state.tasks = state.tasks.map(t => ({ ...t, updatedAt: Date.now() }));
-                    state.handovers = state.handovers.map(h => ({ ...h, updatedAt: Date.now() }));
-                    state.clinicSlots = state.clinicSlots.map(c => ({ ...c, updatedAt: Date.now() }));
-                    state.teamMessages = state.teamMessages.map(m => ({ ...m, updatedAt: Date.now() }));
+        function toggleTask(id) {
+            const t = state.tasks.find(t => t.id === id);
+            if (t) {
+                t.done = !t.done;
+                t.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                render();
+                showToast(t.done ? '✅ تم إنجاز المهمة' : '🔄 تم إعادة فتح المهمة');
+            }
+        }
 
-                    await store.setItem('state', state);
-                    render();
-                    showToast('✅ تم استيراد البيانات بنجاح');
-                    // محاولة رفعها للخادم
-                    syncInBackground();
-                } catch (err) {
-                    alert('⚠️ ملف غير صالح');
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
-        };
+        // ════════════════════════════════════════════════════════════════
+        //  5. الفريق (Team)
+        // ════════════════════════════════════════════════════════════════
 
-        // ============================================================
-        //  8. إبقاء الخادم مستيقظاً (Ping داخلي)
-        // ============================================================
+        function renderTeam(container) {
+            let html = `
+                <div class="flex-between mb-8">
+                    <h2 style="font-size:18px;">👥 الفريق</h2>
+                    <span class="text-muted">${state.teamMembers.length} أعضاء</span>
+                </div>
+                <div class="member-list">
+                    ${state.teamMembers.map(m => `
+                        <span class="member">
+                            ${getRoleEmoji(m.role)} ${m.name}
+                            <span class="role-tag">${getRoleLabel(m.role)}</span>
+                            ${m.role === state.currentRole ? '⭐' : ''}
+                        </span>
+                    `).join('')}
+                </div>
+                <div style="margin:10px 0;">
+                    <h3 style="font-size:14px;margin-bottom:4px;">💬 المحادثة</h3>
+                </div>
+            `;
+
+            if (!state.teamMessages.length) {
+                html += `<div class="empty-state"><div class="emoji">💬</div><p>لا توجد رسائل</p></div>`;
+            } else {
+                state.teamMessages.slice().reverse().forEach(m => {
+                    html += `
+                        <div class="message">
+                            <div class="flex-between">
+                                <span class="sender">${m.sender}</span>
+                                <span class="time">${m.time}</span>
+                            </div>
+                            <div class="text">${m.text}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                    <textarea id="teamMsgInput" placeholder="اكتب رسالة..." style="flex:1;min-height:40px;margin:0;"></textarea>
+                    <button onclick="sendTeamMsg()" style="align-self:flex-end;">إرسال</button>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function sendTeamMsg() {
+            const input = document.getElementById('teamMsgInput');
+            if (!input) return;
+            const msg = input.value.trim();
+            if (!msg) return;
+            const sender = state.teamMembers.find(m => m.role === state.currentRole)?.name || getRoleLabel(state.currentRole);
+            state.teamMessages.push({
+                sender: sender,
+                text: msg,
+                time: timeNow(),
+                read: false,
+                updatedAt: Date.now()
+            });
+            input.value = '';
+            saveState();
+            syncDelayed();
+            render();
+            showToast('💬 تم إرسال الرسالة');
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  6. التسليم (Handover)
+        // ════════════════════════════════════════════════════════════════
+
+        function renderHandover(container) {
+            let html = `
+                <div class="flex-between mb-8">
+                    <h2 style="font-size:18px;">📝 التسليم</h2>
+                    ${can(['junior','senior']) ? `<button class="small" onclick="createHandover()">➕ جديد</button>` : ''}
+                </div>
+            `;
+
+            const sorted = [...state.handovers].sort((a, b) => {
+                if (a.urgent && !a.acknowledged) return -1;
+                if (b.urgent && !b.acknowledged) return 1;
+                return 0;
+            });
+
+            if (!sorted.length) {
+                html += `<div class="empty-state"><div class="emoji">📄</div><p>لا يوجد تسليم</p></div>`;
+            } else {
+                sorted.forEach(h => {
+                    const isUrgent = h.urgent && !h.acknowledged;
+                    html += `
+                        <div class="card" style="border-right-color:${isUrgent ? 'var(--danger)' : 'var(--primary)'};">
+                            <div class="flex-between">
+                                <span class="title" style="font-size:13px;">${h.date} · ${h.author}</span>
+                                <div>
+                                    ${isUrgent ? '<span class="urgent-badge">🚨 عاجل</span>' : ''}
+                                    ${h.acknowledged ? '<span class="done-badge">✓ تم الاستلام</span>' : ''}
+                                </div>
+                            </div>
+                            <div style="font-size:12px;margin-top:4px;">
+                                <div><b>S:</b> ${h.situation}</div>
+                                <div><b>B:</b> ${h.background}</div>
+                                <div><b>A:</b> ${h.assessment}</div>
+                                <div><b>R:</b> ${h.recommendation}</div>
+                            </div>
+                            ${!h.acknowledged ? `<div class="actions"><button class="small" onclick="acknowledgeHandover('${h.id}')">✓ استلام</button></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        function createHandover() {
+            openModal(`
+                <h2>📝 تسليم جديد (SBAR)</h2>
+                <label>الموقف (S) *</label><input id="hoS" placeholder="ماذا يحدث؟">
+                <label>الخلفية (B) *</label><input id="hoB" placeholder="التاريخ المرضي؟">
+                <label>التقييم (A) *</label><input id="hoA" placeholder="التشخيص؟">
+                <label>التوصية (R) *</label><input id="hoR" placeholder="ماذا نفعل؟">
+                <label class="check-label" style="margin-top:4px;">
+                    <input type="checkbox" id="hoUrgent"> 🚨 عاجل
+                </label>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <button onclick="saveHandover()">حفظ</button>
+                    <button class="secondary" onclick="closeModal()">إلغاء</button>
+                </div>
+            `);
+        }
+
+        function saveHandover() {
+            const s = document.getElementById('hoS').value.trim();
+            const b = document.getElementById('hoB').value.trim();
+            const a = document.getElementById('hoA').value.trim();
+            const r = document.getElementById('hoR').value.trim();
+            const urgent = document.getElementById('hoUrgent').checked;
+
+            if (!s || !b || !a || !r) {
+                alert('⚠️ جميع حقول SBAR مطلوبة');
+                return;
+            }
+
+            state.handovers.push({
+                id: 'h' + uid(),
+                date: today(),
+                author: getRoleLabel(state.currentRole),
+                situation: s,
+                background: b,
+                assessment: a,
+                recommendation: r,
+                urgent,
+                acknowledged: false,
+                updatedAt: Date.now()
+            });
+
+            saveState();
+            syncDelayed();
+            closeModal();
+            render();
+            showToast('📝 تم حفظ التسليم');
+        }
+
+        function acknowledgeHandover(id) {
+            const h = state.handovers.find(h => h.id === id);
+            if (h) {
+                h.acknowledged = true;
+                h.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                render();
+                showToast('✅ تم استلام التسليم');
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  7. لوحة الإدارة (للاستشاري فقط)
+        // ════════════════════════════════════════════════════════════════
+
+        function openAdminPanel() {
+            if (state.currentRole !== 'senior') {
+                showToast('⚠️ هذه اللوحة للاستشاري فقط');
+                return;
+            }
+
+            let html = `
+                <h2>🔑 إدارة الفريق</h2>
+                <h3>الأعضاء الحاليون</h3>
+            `;
+
+            state.teamMembers.forEach(m => {
+                html += `
+                    <div class="card" style="border-right-color:#8b5cf6;padding:10px;">
+                        <div class="flex-between">
+                            <span><b>${m.name}</b> <span class="role-tag">${getRoleLabel(m.role)}</span></span>
+                            <span class="text-muted">${m.id}</span>
+                        </div>
+                        <div class="actions">
+                            <button class="small secondary" onclick="changeMemberRole('${m.id}')">🔄 تغيير الدور</button>
+                            <button class="small danger" onclick="removeMember('${m.id}')">🗑️ حذف</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <h3>➕ إضافة عضو جديد</h3>
+                <label>الاسم</label><input id="newMemberName" placeholder="مثال: د. فاطمة">
+                <label>الدور</label>
+                <select id="newMemberRole" class="form-input">
+                    <option value="junior">طبيب مبتدئ</option>
+                    <option value="nurse">ممرض</option>
+                    <option value="admin">إداري</option>
+                </select>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button onclick="addMember()">➕ إضافة</button>
+                    <button class="secondary" onclick="closeModal()">إغلاق</button>
+                </div>
+                <div class="text-muted text-sm" style="margin-top:4px;">🔑 سيتم توليد معرف وبريد تلقائي</div>
+            `;
+
+            openModal(html);
+        }
+
+        function addMember() {
+            const name = document.getElementById('newMemberName').value.trim();
+            const role = document.getElementById('newMemberRole').value;
+            if (!name) { alert('الاسم مطلوب'); return; }
+            const id = 'u' + uid();
+            state.teamMembers.push({ id, name, role, updatedAt: Date.now() });
+            saveState();
+            syncDelayed();
+            closeModal();
+            render();
+            showToast(`✅ تم إضافة ${name}`);
+        }
+
+        function removeMember(id) {
+            if (!confirm('حذف هذا العضو؟')) return;
+            state.teamMembers = state.teamMembers.filter(m => m.id !== id);
+            saveState();
+            syncDelayed();
+            closeModal();
+            render();
+            showToast('🗑️ تم حذف العضو');
+        }
+
+        function changeMemberRole(id) {
+            const m = state.teamMembers.find(m => m.id === id);
+            if (!m) return;
+            const newRole = prompt('الدور الجديد (senior/junior/nurse/admin):', m.role);
+            if (newRole && ['senior', 'junior', 'nurse', 'admin'].includes(newRole)) {
+                m.role = newRole;
+                m.updatedAt = Date.now();
+                saveState();
+                syncDelayed();
+                closeModal();
+                render();
+                showToast('🔄 تم تحديث الدور');
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  8. بدء التشغيل
+        // ════════════════════════════════════════════════════════════════
+
+        // تحميل البيانات
+        loadState();
+
+        // تعيين الدور الحالي في القائمة
+        document.getElementById('roleSelect').value = state.currentRole;
+
+        // عرض زر الإدارة
+        const adminBtn = document.getElementById('adminBtn');
+        adminBtn.classList.toggle('visible', state.currentRole === 'senior');
+
+        // بدء المزامنة مع الخادم
+        setTimeout(syncToServer, 1000);
+
+        // تحديث واجهة المستخدم كل 5 دقائق (للتزامن)
+        setInterval(() => {
+            syncToServer();
+        }, 300000);
+
+        // Ping لإبقاء الخادم مستيقظاً
         setInterval(async () => {
-            try {
-                await fetch('/api/ping');
-                console.log('🏓 Ping sent to server');
-            } catch (e) { /* تجاهل */ }
-        }, 60000); // كل دقيقة
+            try { await fetch('/api/ping'); } catch (e) { /* تجاهل */ }
+        }, 60000);
 
-        // ============================================================
-        //  9. بدء التشغيل
-        // ============================================================
-        loadLocalState();
+        // التصيير
+        render();
 
-        console.log('✅ PaedsWard جاهز!');
-        console.log('📊 عدد المرضى:', state.patients.length);
+        console.log('🏥 PaedsWard جاهز!');
+        console.log('👤 الدور:', state.currentRole);
+        console.log('👥 المرضى:', state.patients.length);
+        console.log('📋 المهام:', state.tasks.length);
     </script>
 </body>
 </html>
