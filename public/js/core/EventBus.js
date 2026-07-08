@@ -30,6 +30,5 @@ class EventBus {
   }
 }
 
-// تصدير نسخة واحدة مشتركة
 const bus = new EventBus();
-window.bus = bus; // للوصول من أي مكان
+window.bus = bus;
