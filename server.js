@@ -1,132 +1,110 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>PaedsWard - الحل النهائي</title>
-    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            font-family: -apple-system, system-ui, sans-serif;
-            background: #f1f5f9;
-            padding: 16px;
-            max-width: 500px;
-            margin: auto;
-        }
-        .header {
-            background: #1a73e8;
-            color: white;
-            padding: 16px;
-            border-radius: 16px 16px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .status-bar {
-            background: #e2e8f0;
-            padding: 8px 16px;
-            font-size: 12px;
-            color: #475569;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #cbd5e1;
-        }
-        .status-bar .online {
-            color: #22c55e;
-        }
-        .status-bar .offline {
-            color: #ef4444;
-        }
-        .content {
-            background: white;
-            padding: 16px;
-            min-height: 60vh;
-            border-radius: 0 0 16px 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-        }
-        .card {
-            background: #f8fafc;
-            border-right: 4px solid #1a73e8;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 8px;
-        }
-        .card .title {
-            font-weight: 700;
-        }
-        button {
-            background: #1a73e8;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        button:active {
-            transform: scale(0.96);
-        }
-        button.secondary {
-            background: #e2e8f0;
-            color: #1e293b;
-        }
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            color: white;
-            padding: 10px 24px;
-            border-radius: 30px;
-            font-size: 14px;
-            z-index: 999;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-        .flex {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 8px 0;
-        }
-        input,
-        textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            margin: 4px 0;
-            font-family: inherit;
-        }
-    </style>
-</head>
-<body>
+const express = require('express');
+const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
+const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
 
-    <div id="app">
-        <div class="header">
-            <span style="font-size:20px;font-weight:800;">🏥 PaedsWard</span>
-            <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:30px;">حقيقي + ذكي</span>
-        </div>
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
 
-        <div class="status-bar">
-            <span id="statusText">⏳ جاري التحميل...</span>
-            <span>
-                <span id="syncIndicator" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
-                <span id="syncLabel" style="font-size:11px;">محلي</span>
-            </span>
-        </div>
+// ============================================================
+//  1. قاعدة بيانات SQLite (مع Promises)
+// ============================================================
+const db = new sqlite3.Database('paedsward.db');
 
-        <div class="content" id="content">
-            <p>جاري تحميل البيانات...</p>
-        </div>
+const run = promisify(db.run.bind(db));
+const all = promisify(db.all.bind(db));
+const exec = promisify(db.exec.bind(db));
 
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-            <button onclick="syncNow()">🔄 مزامنة الآن</button>
-            <button class="secondary" onclick="addDemoPatient()">➕ إضافة مريض تجريبي</button>
-            <button class="secondary" onclick="exportData
+// إنشاء الجداول
+async function initDB() {
+  await exec(`
+    CREATE TABLE IF NOT EXISTS patients (
+      id TEXT PRIMARY KEY, name TEXT, age REAL, weight REAL, bed TEXT,
+      diagnosis TEXT, status TEXT, vitals TEXT, fluids TEXT, meds TEXT,
+      notes TEXT, admissionDate TEXT, dischargeDate TEXT, updatedAt INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY, text TEXT, priority TEXT, assignee TEXT,
+      done INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS handovers (
+      id TEXT PRIMARY KEY, date TEXT, author TEXT, situation TEXT,
+      background TEXT, assessment TEXT, recommendation TEXT,
+      urgent INTEGER DEFAULT 0, acknowledged INTEGER DEFAULT 0, updatedAt INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS clinicSlots (
+      id TEXT PRIMARY KEY, time TEXT, patientName TEXT, age INTEGER,
+      reason TEXT, status TEXT, updatedAt INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS teamMessages (
+      id TEXT PRIMARY KEY, sender TEXT, text TEXT, time TEXT,
+      read INTEGER DEFAULT 0, updatedAt INTEGER
+    );
+  `);
+}
+initDB().catch(console.error);
+
+// دوال مساعدة لتحويل القيم
+const toBool = (v) => !!v;
+const rowMapper = (row) => ({
+  ...row,
+  done: toBool(row.done),
+  urgent: toBool(row.urgent),
+  acknowledged: toBool(row.acknowledged),
+  read: toBool(row.read)
+});
+
+// ============================================================
+//  2. نقاط النهاية (API)
+// ============================================================
+
+// جلب كل البيانات دفعة واحدة
+app.get('/api/state', async (req, res) => {
+  try {
+    const patients = (await all('SELECT * FROM patients')).map(rowMapper);
+    const tasks = (await all('SELECT * FROM tasks')).map(rowMapper);
+    const handovers = (await all('SELECT * FROM handovers')).map(rowMapper);
+    const clinicSlots = (await all('SELECT * FROM clinicSlots')).map(rowMapper);
+    const teamMessages = (await all('SELECT * FROM teamMessages')).map(rowMapper);
+    res.json({ patients, tasks, handovers, clinicSlots, teamMessages });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// تحديث مجموعة معينة (استبدال كامل)
+app.post('/api/sync/:collection', async (req, res) => {
+  const { collection } = req.params;
+  const data = req.body;
+  const valid = ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMessages'];
+  if (!valid.includes(collection)) {
+    return res.status(400).json({ error: 'Invalid collection' });
+  }
+  try {
+    await run(`DELETE FROM ${collection}`);
+    if (data.length > 0) {
+      const columns = Object.keys(data[0]);
+      const placeholders = columns.map(() => '?').join(',');
+      const stmt = db.prepare(`INSERT INTO ${collection} (${columns.join(',')}) VALUES (${placeholders})`);
+      for (const item of data) {
+        const values = columns.map(col => item[col] !== undefined ? item[col] : null);
+        await new Promise((resolve, reject) => {
+          stmt.run(values, function(err) { if (err) reject(err); else resolve(); });
+        });
+      }
+      stmt.finalize();
+    }
+    res.json({ success: true, count: data.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// نقطة إيقاظ (Ping)
+app.get('/api/ping', (req, res) => {
+  res.json({ status: 'awake', time: new Date
