@@ -1,5 +1,6 @@
 // ================================================================
 //  constants.js – الثوابت العامة (ROLES, Permissions, Helpers)
+//  جميع التعديلات المستقبلية للصلاحيات تكون هنا فقط
 // ================================================================
 
 // ─── تعريف الأدوار والصلاحيات (RBAC) ───
@@ -21,11 +22,13 @@ export const ROLES = {
   ]
 };
 
-// ─── دوال مساعدة ───
+// ─── دوال مساعدة للصلاحيات ───
 export function hasPermission(role, permission) {
+  if (!role || !permission) return false;
   return ROLES[role]?.includes(permission) || false;
 }
 
+// ─── دوال مساعدة عامة ───
 export function getRoleLabel(role) {
   const map = { senior: 'استشاري', junior: 'طبيب مبتدئ', nurse: 'ممرض', admin: 'إداري' };
   return map[role] || role;
@@ -45,4 +48,11 @@ export const TABS = [
   { id: 'team', icon: '👥', label: 'الفريق' },
   { id: 'handover', icon: '📝', label: 'التسليم' },
   { id: 'reports', icon: '📊', label: 'التقارير' }
+];
+
+// ─── المستخدمون الافتراضيون (لتسجيل الدخول) ───
+export const DEFAULT_USERS = [
+  { email: 'admin@ward.com', password: 'admin123', role: 'senior', name: 'د. المدير' },
+  { email: 'doctor@ward.com', password: 'doctor123', role: 'junior', name: 'د. مبتدئ' },
+  { email: 'nurse@ward.com', password: 'nurse123', role: 'nurse', name: 'م. تمريض' }
 ];
