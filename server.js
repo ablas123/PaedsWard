@@ -57,10 +57,10 @@ function saveDatabase() {
 }
 
 // ============================================================
-//  نظام الصلاحيات (RBAC)
+//  نظام الصلاحيات (RBAC) – متوافق مع العميل
 // ============================================================
 const ROLES = {
-  senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients'],
+  senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
   junior: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals'],
   nurse: ['update_vitals', 'view_patients', 'complete_tasks'],
   admin: ['manage_clinic', 'view_patients', 'send_alerts']
@@ -110,17 +110,17 @@ app.post('/api/:collection', (req, res) => {
   const newItem = req.body;
   const role = getRoleFromHeaders(req);
 
-  if (collection === 'patients' && !hasPermission(role, 'admit')) {
-    return res.status(403).json({ error: 'غير مصرح لك بقبول مرضى' });
-  }
-  if (collection === 'tasks' && !hasPermission(role, 'create_task')) {
-    return res.status(403).json({ error: 'غير مصرح لك بإنشاء مهام' });
-  }
-  if (collection === 'handovers' && !hasPermission(role, 'create_handover')) {
-    return res.status(403).json({ error: 'غير مصرح لك بإنشاء تسليم' });
-  }
-  if (collection === 'clinicSlots' && !hasPermission(role, 'manage_clinic')) {
-    return res.status(403).json({ error: 'غير مصرح لك بإدارة العيادة' });
+  // التحقق من الصلاحيات
+  const permMap = {
+    patients: 'admit',
+    tasks: 'create_task',
+    handovers: 'create_handover',
+    clinicSlots: 'manage_clinic',
+    teamMessages: 'send_alerts'
+  };
+  const requiredPerm = permMap[collection];
+  if (requiredPerm && !hasPermission(role, requiredPerm)) {
+    return res.status(403).json({ error: 'غير مصرح لك بهذه العملية' });
   }
 
   loadDatabase();
@@ -139,6 +139,7 @@ app.patch('/api/:collection/:id', (req, res) => {
   const updates = req.body;
   const role = getRoleFromHeaders(req);
 
+  // التحقق من الصلاحيات
   if (collection === 'patients' && !hasPermission(role, 'view_patients')) {
     return res.status(403).json({ error: 'غير مصرح لك بتحديث بيانات المرضى' });
   }
@@ -160,14 +161,12 @@ app.delete('/api/:collection/:id', (req, res) => {
   const { collection, id } = req.params;
   const role = getRoleFromHeaders(req);
 
+  // التحقق من الصلاحيات
   if (collection === 'patients' && !hasPermission(role, 'discharge')) {
     return res.status(403).json({ error: 'غير مصرح لك بحذف مرضى' });
   }
   if (collection === 'tasks' && !hasPermission(role, 'create_task')) {
     return res.status(403).json({ error: 'غير مصرح لك بحذف مهام' });
-  }
-  if (collection === 'handovers' && !hasPermission(role, 'create_handover')) {
-    return res.status(403).json({ error: 'غير مصرح لك بحذف تسليم' });
   }
 
   loadDatabase();
@@ -177,7 +176,7 @@ app.delete('/api/:collection/:id', (req, res) => {
 
   const deleted = db[collection][index];
   db[collection].splice(index, 1);
-  saveDatabase(); // 🔥 إصلاح الحذف: حفظ التغيير على القرص
+  saveDatabase();
 
   addAuditLog(`حذف ${collection}`, `تم حذف عنصر: ${id} (${deleted.name || deleted.text || ''})`, req);
   res.json({ success: true });
