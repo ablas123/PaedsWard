@@ -13,14 +13,15 @@ class StateManager {
       teamMessages: [],
       auditLog: [],
       currentRole: 'junior',
-      syncQueue: [], // طابور المزامنة الخلفي
+      currentUser: null,
+      searchQuery: '',
+      syncQueue: [],
       _version: '7.0.0'
     };
     this.syncInProgress = false;
     this.offlineMode = !navigator.onLine;
   }
 
-  // ─── تحميل الحالة من IndexedDB ───
   async load() {
     try {
       const saved = await this.store.getItem('state');
@@ -31,7 +32,6 @@ class StateManager {
           this.state = { ...this.state, ...saved };
         }
       }
-      // إعداد مستمع حالة الاتصال
       window.addEventListener('online', () => this._handleOnline());
       window.addEventListener('offline', () => this._handleOffline());
       bus.emit('stateLoaded', this.state);
@@ -42,7 +42,6 @@ class StateManager {
     }
   }
 
-  // ─── حفظ الحالة في IndexedDB ───
   async save() {
     try {
       this.state._version = '7.0.0';
@@ -55,7 +54,6 @@ class StateManager {
     }
   }
 
-  // ─── ترقية البيانات (Migration) ───
   _migrate(oldState) {
     const merged = { ...this.state, ...oldState };
     if (!merged.syncQueue) merged.syncQueue = [];
@@ -64,10 +62,18 @@ class StateManager {
     this.save();
   }
 
-  // ─── دوال مساعدة ───
   get() { return this.state; }
   set(newState) { this.state = { ...this.state, ...newState }; this.save(); }
   update(key, value) { this.state[key] = value; this.save(); }
+
+  // ─── الحصول على الـ Headers مع الصلاحيات ───
+  getHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'X-User-Role': this.state.currentRole || 'junior',
+      'X-User-Name': this.state.currentUser?.name || 'جهاز محلي'
+    };
+  }
 
   // ─── إضافة عملية إلى طابور المزامنة ───
   addToQueue(collection, method, data, entityId) {
@@ -75,18 +81,31 @@ class StateManager {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
       collection,
       method,
-      data,
-      entityId: entityId || data.id,
+      data: data ? JSON.parse(JSON.stringify(data)) : null,
+      entityId: entityId || data?.id || null,
       timestamp: Date.now()
     };
     this.state.syncQueue.push(op);
     this.save();
     bus.emit('syncQueueUpdated', this.state.syncQueue);
-    // إذا كان الاتصال متاحًا، حاول المزامنة فورًا
     if (navigator.onLine) this.processSyncQueue();
   }
 
-  // ─── معالجة طابور المزامنة (مع دمج المعرفات المؤقتة) ───
+  // ─── تحديث المعرفات في جميع الحقول (للمزامنة) ───
+  _updateAllEntityIds(obj, oldId, newId) {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      if (obj[key] === oldId) {
+        obj[key] = newId;
+      } else if (Array.isArray(obj[key])) {
+        obj[key] = obj[key].map(item => item === oldId ? newId : item);
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        this._updateAllEntityIds(obj[key], oldId, newId);
+      }
+    }
+  }
+
+  // ─── معالجة طابور المزامنة ───
   async processSyncQueue() {
     if (this.syncInProgress || !navigator.onLine) return;
     if (this.state.syncQueue.length === 0) return;
@@ -95,7 +114,6 @@ class StateManager {
     bus.emit('syncStarted');
 
     try {
-      // تجميع العمليات حسب الكيان (entityId)
       const grouped = {};
       for (const op of this.state.syncQueue) {
         const key = `${op.collection}:${op.entityId}`;
@@ -104,79 +122,86 @@ class StateManager {
       }
 
       for (const [key, operations] of Object.entries(grouped)) {
-        // ترتيب العمليات حسب الوقت
         operations.sort((a, b) => a.timestamp - b.timestamp);
-
         const firstOp = operations[0];
         let currentId = firstOp.entityId;
+        const headers = this.getHeaders();
 
-        // إذا كانت أول عملية POST، نرسلها ونحصل على المعرف الحقيقي
         if (firstOp.method === 'POST') {
           try {
-            const response = await fetch(`/api/${firstOp.collection}`, {
+            const url = `/api/${firstOp.collection}`;
+            const response = await fetch(url, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-User-Role': this.state.currentRole,
-                'X-User-Name': 'جهاز محلي'
-              },
+              headers: headers,
               body: JSON.stringify(firstOp.data)
             });
-            if (!response.ok) throw new Error('POST failed');
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error(`POST failed: ${response.status} ${errText}`);
+            }
             const result = await response.json();
-            const realId = result.item.id || result.item._id;
+            const realId = result.item?.id || result.id || result._id;
 
-            // تحديث جميع العمليات اللاحقة لهذا الكيان لاستخدام realId
-            for (let i = 1; i < operations.length; i++) {
-              const op = operations[i];
-              if (op.entityId === currentId) {
-                op.entityId = realId;
-                op.url = op.url ? op.url.replace(currentId, realId) : undefined;
-                if (op.data && op.data.id === currentId) {
-                  op.data.id = realId;
+            if (realId && realId !== currentId) {
+              for (let i = 1; i < operations.length; i++) {
+                const op = operations[i];
+                if (op.entityId === currentId) {
+                  op.entityId = realId;
+                  if (op.data) this._updateAllEntityIds(op.data, currentId, realId);
                 }
               }
+              // تحديث البيانات المحلية
+              const localData = this.state[firstOp.collection] || [];
+              const item = localData.find(item => item.id === currentId);
+              if (item) {
+                item.id = realId;
+                // تحديث المراجع الأخرى
+                for (const [coll, items] of Object.entries(this.state)) {
+                  if (Array.isArray(items)) {
+                    for (const ref of items) {
+                      if (ref.patientId === currentId) ref.patientId = realId;
+                      if (ref.patientId === currentId) ref.patientId = realId;
+                    }
+                  }
+                }
+                this.save();
+              }
+              currentId = realId;
             }
-            currentId = realId;
           } catch (e) {
             console.error('Sync POST failed:', e);
-            continue; // تخطي هذه المجموعة في هذه الدورة
+            continue;
           }
         }
 
-        // الآن نرسل باقي العمليات (PUT, PATCH, DELETE) بالتسلسل مع المعرف الصحيح
         for (const op of operations) {
-          if (op.method === 'POST') continue; // تم معالجته أعلاه
+          if (op.method === 'POST') continue;
           try {
             const url = `/api/${op.collection}/${op.entityId}`;
             const options = {
               method: op.method,
-              headers: {
-                'Content-Type': 'application/json',
-                'X-User-Role': this.state.currentRole,
-                'X-User-Name': 'جهاز محلي'
-              }
+              headers: this.getHeaders()
             };
             if (op.data && (op.method === 'PATCH' || op.method === 'PUT' || op.method === 'POST')) {
               options.body = JSON.stringify(op.data);
             }
             const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`${op.method} failed`);
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error(`${op.method} failed: ${response.status} ${errText}`);
+            }
           } catch (e) {
             console.error(`Sync ${op.method} failed:`, e);
-            // نترك العملية في الطابور لإعادة المحاولة لاحقًا
             continue;
           }
         }
 
-        // بعد نجاح كل العمليات، نزيلها من الطابور
         this.state.syncQueue = this.state.syncQueue.filter(op => {
           const k = `${op.collection}:${op.entityId}`;
           return k !== key;
         });
       }
 
-      // حفظ التغييرات بعد المعالجة
       await this.save();
       bus.emit('syncCompleted', this.state.syncQueue);
     } catch (e) {
@@ -187,7 +212,6 @@ class StateManager {
     }
   }
 
-  // ─── معالجة العودة للاتصال ───
   _handleOnline() {
     this.offlineMode = false;
     bus.emit('networkOnline');
@@ -200,6 +224,5 @@ class StateManager {
   }
 }
 
-// تصدير نسخة واحدة
 const stateManager = new StateManager();
 window.stateManager = stateManager;
