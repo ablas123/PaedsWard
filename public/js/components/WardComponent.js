@@ -1,370 +1,400 @@
-import EventBus from '../core/EventBus.js';
-import StateManager from '../core/StateManager.js';
+// ================================================================
+//  مكون الجناح (Ward) – مع سير العمل وإدارة المرضى
+// ================================================================
+class WardComponent {
+  constructor() {
+    this.container = document.getElementById('appContent');
+    this.tab = 'ward';
+    bus.on('switchTab', (tab) => {
+      if (tab === this.tab) this.render();
+    });
+    bus.on('render', () => {
+      if (this.tab === 'ward') this.render();
+    });
+    bus.on('stateChanged', () => this.render());
+  }
 
-/**
- * ==========================================================================
- * 🏥 مكون إدارة جناح الأطفال والقبول الذكي (Ward & Admission Component)
- * الميزات: نظام أتمتة حساب PEWS، نموذج قبول بـ 3 خطوات، لوحة سير العمل
- * ==========================================================================
- */
-export class WardComponent {
-    constructor() {
-        this.container = document.getElementById('wardStagesContainer');
-        this.wizardBtn = document.getElementById('openAdmissionWizardBtn');
-        this.modalOverlay = document.getElementById('modalOverlay');
-        this.modalBox = document.getElementById('modalBox');
-        
-        this.currentSearchQuery = '';
-        this.currentWizardStep = 1;
+  render() {
+    const state = stateManager.get();
+    const active = state.patients.filter(p => p.status !== 'discharged');
+    const discharged = state.patients.filter(p => p.status === 'discharged');
+    const search = state.searchQuery || '';
 
-        this.init();
-    }
+    // تطبيق البحث
+    const filtered = active.filter(p =>
+      p.name.includes(search) || p.diagnosis.includes(search) || p.bed.includes(search)
+    );
 
-    init() {
-        this.renderStagesLayout();
-        this.bindEvents();
-        this.setupListeners();
-    }
+    let html = `
+      <div class="flex-between mb-8">
+        <h2 style="font-size:18px;">🏥 الجناح</h2>
+        ${this.hasPermission('admit') ? `<button class="small" onclick="ward.showAdmissionWizard()">➕ قبول</button>` : ''}
+      </div>
+      <div class="text-muted text-sm">👥 ${filtered.length} مريض نشط · ${discharged.length} مكتمل</div>
+    `;
 
-    bindEvents() {
-        // فتح معالج القبول الذكي عند الضغط على الزر
-        if (this.wizardBtn) {
-            this.wizardBtn.addEventListener('click', () => this.openAdmissionWizard());
-        }
-    }
-
-    setupListeners() {
-        // إعادة البناء عند تحديث البيانات الكلية
-        EventBus.on('stateRefreshed', () => this.updateDisplay());
-        EventBus.on('patientAdded', () => this.updateDisplay());
-        EventBus.on('patientUpdated', () => this.updateDisplay());
-
-        // الاستماع للبحث العالمي الفوري
-        EventBus.on('globalSearchTriggered', (query) => {
-            this.currentSearchQuery = query;
-            this.updateDisplay();
-        });
-
-        // تحديث العرض عند تغيير الدور الطبي لإخفاء/إظهار أزرار التحكم
-        EventBus.on('roleChanged', () => this.updateDisplay());
-    }
-
-    /**
-     * بناء الأعمدة الأربعة الثابتة لسير العمل داخل الجناح
-     */
-    renderStagesLayout() {
-        this.container.innerHTML = `
-            <div class="ward-stage-column" data-stage="1" id="stage-col-1">
-                <div class="stage-title">📥 1. الاستقبال <span class="stage-count" id="count-col-1">0</span></div>
-                <div class="stage-cards-pool"></div>
+    if (!filtered.length) {
+      html += `<div class="empty-state"><div class="emoji">🛏️</div><p>${search ? 'لا توجد نتائج بحث' : 'لا يوجد مرضى نشطين'}</p></div>`;
+    } else {
+      filtered.forEach(p => {
+        const stage = p.workflowStage || 1;
+        const stageLabels = ['الاستقبال', 'الخطة', 'التنفيذ', 'الخروج'];
+        const stageClass = `stage${stage}`;
+        const borderColor = stage === 3 ? 'var(--danger)' : stage === 2 ? 'var(--warning)' : 'var(--primary)';
+        html += `
+          <div class="card clickable" onclick="ward.viewPatient('${p.id}')" style="border-right-color:${borderColor};">
+            <div class="flex-between">
+              <div>
+                <div class="title">${p.name} <span class="text-muted text-sm">(${p.age}س)</span></div>
+                <div class="sub">${p.diagnosis} · سرير ${p.bed}</div>
+              </div>
+              <span class="status-badge ${stageClass}">${stageLabels[stage-1]}</span>
             </div>
-            <div class="ward-stage-column" data-stage="2" id="stage-col-2">
-                <div class="stage-title">📝 2. وضع الخطة <span class="stage-count" id="count-col-2">0</span></div>
-                <div class="stage-cards-pool"></div>
+            <div class="meta">
+              <span>⚖️ ${p.weight}كجم</span>
+              <span>🩺 ${p.vitals || '—'}</span>
             </div>
-            <div class="ward-stage-column" data-stage="3" id="stage-col-3">
-                <div class="stage-title">⚡ 3. التنفيذ العلاجي <span class="stage-count" id="count-col-3">0</span></div>
-                <div class="stage-cards-pool"></div>
+            <div class="actions">
+              ${this.hasPermission('update_vitals') ? `<button class="small secondary" onclick="event.stopPropagation();ward.updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
+              ${this.hasPermission('write_notes') ? `<button class="small secondary" onclick="event.stopPropagation();ward.addNote('${p.id}')">📝 ملاحظة</button>` : ''}
+              ${this.hasPermission('approve_plan') && stage < 4 ? `<button class="small secondary" onclick="event.stopPropagation();ward.advanceStage('${p.id}')">➡️ تقدم</button>` : ''}
+              ${this.hasPermission('discharge') ? `<button class="small danger" onclick="event.stopPropagation();ward.dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
             </div>
-            <div class="ward-stage-column" data-stage="4" id="stage-col-4">
-                <div class="stage-title">🏁 4. جاهز للخروج <span class="stage-count" id="count-col-4">0</span></div>
-                <div class="stage-cards-pool"></div>
-            </div>
+          </div>
         `;
+      });
     }
 
-    /**
-     * تحديث وتوزيع بطاقات الأطفال على الأعمدة بناءً على الفلترة والبحث
-     */
-    updateDisplay() {
-        const patients = StateManager.state.patients || [];
-        
-        // تفريغ الأوعية الحالية أولاً
-        for (let i = 1; i <= 4; i++) {
-            const pool = document.querySelector(`#stage-col-${i} .stage-cards-pool`);
-            if (pool) pool.innerHTML = '';
-            const countBadge = document.getElementById(`count-col-${i}`);
-            if (countBadge) countBadge.textContent = '0';
-        }
-
-        const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
-
-        // فلترة وتوزيع المرضى
-        patients.forEach(patient => {
-            // التحقق من مطابقة البحث العالمي (الاسم، التشخيص، أو رقم الملف)
-            const matchesSearch = !this.currentSearchQuery || 
-                patient.name.toLowerCase().includes(this.currentSearchQuery) ||
-                patient.diagnosis.toLowerCase().includes(this.currentSearchQuery) ||
-                patient.fileNumber.includes(this.currentSearchQuery);
-
-            if (!matchesSearch) return;
-
-            const stage = patient.stage || 1;
-            const pool = document.querySelector(`#stage-col-${stage} .stage-cards-pool`);
-            
-            if (pool) {
-                counts[stage]++;
-                const card = this.createPatientCard(patient);
-                pool.appendChild(card);
-            }
-        });
-
-        // تحديث شارات الأعداد أعلى الأعمدة
-        for (let i = 1; i <= 4; i++) {
-            const countBadge = document.getElementById(`count-col-${i}`);
-            if (countBadge) countBadge.textContent = counts[i];
-        }
+    if (discharged.length) {
+      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ مكتمل (${discharged.length})</summary>`;
+      discharged.forEach(p => {
+        html += `<div class="card" style="border-right-color:var(--gray);opacity:0.6;">
+          <div class="flex-between"><span class="title" style="font-size:13px;">${p.name}</span><span class="status-badge discharged">مكتمل</span></div>
+          <div class="sub">${p.diagnosis} · ${p.age}س</div>
+        </div>`;
+      });
+      html += `</details>`;
     }
 
-    /**
-     * توليد كود HTML لبطاقة الطفل مع تحديد خطورة الحالة (PEWS Class)
-     */
-    createPatientCard(patient) {
-        const card = document.createElement('div');
-        
-        // حساب وتقييم الـ PEWS لتلوين حواف البطاقة فوراً للأمان السريري
-        let pewsClass = 'pews-normal';
-        if (patient.pewsScore >= 5 || patient.isCritical) pewsClass = 'pews-high';
-        else if (patient.pewsScore >= 3) pewsClass = 'pews-warn';
+    this.container.innerHTML = html;
+  }
 
-        card.className = `patient-card ${pewsClass}`;
-        card.innerHTML = `
-            <h4>${patient.name}</h4>
-            <div class="patient-meta">
-                <span>📁 ملف: ${patient.fileNumber}</span>
-                <span>🎂 العمر: ${patient.age}</span>
-                <span>🩺 PEWS: <strong>${patient.pewsScore || 0}</strong></span>
+  hasPermission(perm) {
+    const state = stateManager.get();
+    const role = state.currentRole;
+    const ROLES = {
+      senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals'],
+      junior: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals'],
+      nurse: ['update_vitals', 'view_patients', 'complete_tasks'],
+      admin: ['manage_clinic', 'view_patients', 'send_alerts']
+    };
+    return ROLES[role] && ROLES[role].includes(perm);
+  }
+
+  // ─── قبول مريض (Wizard) ───
+  showAdmissionWizard() {
+    let wizardData = {};
+    let step = 1;
+    const render = (s) => {
+      let html = `
+        <h2>➕ قبول مريض جديد</h2>
+        <div class="wizard-progress">
+          ${[1,2,3].map(st => `
+            <div class="step-indicator">
+              <div class="step-circle ${st===s?'active':st<s?'done':''}">${st<s?'✓':st}</div>
+              <div class="step-label">${st===1?'أساسية':st===2?'سريرية':'تاريخ'}</div>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--primary-color);">
-                📋 ${patient.diagnosis}
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                <button class="view-details-btn" style="background: none; border: none; color: var(--accent-color); font-weight: 700; cursor: pointer; font-size: 0.8rem;">👁️ التفاصيل</button>
-                ${this.renderActionBtnForStage(patient)}
-            </div>
-        `;
+          `).join('')}
+        </div>
+        <div class="wizard-step ${s===1?'active':''}" data-step="1">
+          <label>الاسم *</label><input id="admName" value="${wizardData.name||''}" placeholder="مثال: نور الهاشمي">
+          <div class="form-row">
+            <div><label>العمر (سنة) *</label><input id="admAge" type="number" value="${wizardData.age||''}" placeholder="3"></div>
+            <div><label>الوزن (كجم) *</label><input id="admWeight" type="number" step="0.1" value="${wizardData.weight||''}" placeholder="14"></div>
+          </div>
+          <div class="form-row">
+            <div><label>الطول (سم)</label><input id="admHeight" type="number" step="0.1" value="${wizardData.height||''}" placeholder="95"></div>
+            <div><label>السرير *</label><input id="admBed" value="${wizardData.bed||''}" placeholder="مثال: PICU-2"></div>
+          </div>
+          <button onclick="ward.wizardNext(1)" class="block">التالي →</button>
+        </div>
+        <div class="wizard-step ${s===2?'active':''}" data-step="2">
+          <label>التشخيص *</label><input id="admDiagnosis" value="${wizardData.diagnosis||''}" placeholder="مثال: التهاب القصيبات">
+          <label>مصدر الدخول</label>
+          <select id="admSource" class="form-input">
+            <option value="ER">الطوارئ</option>
+            <option value="OPD">العيادة</option>
+            <option value="Transfer">تحويل</option>
+          </select>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button onclick="ward.wizardPrev(2)" class="secondary">← السابق</button>
+            <button onclick="ward.wizardNext(2)" class="block" style="flex:1;">التالي →</button>
+          </div>
+        </div>
+        <div class="wizard-step ${s===3?'active':''}" data-step="3">
+          <label>التاريخ المرضي والفحص</label>
+          <textarea id="admHistory" placeholder="الملاحظات السريرية...">${wizardData.history||''}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button onclick="ward.wizardPrev(3)" class="secondary">← السابق</button>
+            <button onclick="ward.wizardSubmit()" class="success" style="flex:1;">✅ قبول</button>
+          </div>
+        </div>
+      `;
+      openModal(html);
+    };
 
-        // ربط الأحداث للبطاقة
-        card.querySelector('.view-details-btn').addEventListener('click', () => this.openPatientDetailsModal(patient));
-        
-        const advanceBtn = card.querySelector('.advance-stage-btn');
-        if (advanceBtn) {
-            advanceBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.advancePatientStage(patient);
-            });
+    this.wizardNext = (s) => {
+      if (s === 1) {
+        wizardData.name = document.getElementById('admName')?.value || '';
+        wizardData.age = document.getElementById('admAge')?.value || '';
+        wizardData.weight = document.getElementById('admWeight')?.value || '';
+        wizardData.height = document.getElementById('admHeight')?.value || '';
+        wizardData.bed = document.getElementById('admBed')?.value || '';
+        if (!wizardData.name || !wizardData.age || !wizardData.weight || !wizardData.bed) {
+          showToast('⚠️ الحقول المطلوبة يجب تعبئتها', 'error');
+          return;
         }
-
-        return card;
-    }
-
-    renderActionBtnForStage(patient) {
-        // زر الترقية يظهر فقط لصلاحيات الاستشاري/الأخصائي لضمان المأمونية الطبية
-        if (StateManager.currentUserRole !== 'senior') return '';
-        if (patient.stage === 4) return `<button class="advance-stage-btn" style="background: var(--danger-color); color: #fff; border: none; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">🚪 خروج نهائي</button>`;
-        return `<button class="advance-stage-btn" style="background: var(--primary-color); color: #fff; border: none; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">➡️ تقدم</button>`;
-    }
-
-    /**
-     * دالة ترقية مرحلة رعاية الطفل عبر أعمدة الأجنحة
-     */
-    async advancePatientStage(patient) {
-        if (patient.stage < 4) {
-            const nextStage = patient.stage + 1;
-            await StateManager.patchPatient(patient.id, { stage: nextStage });
-        } else {
-            // إذا كان في المرحلة 4 وضغط خروج نهائي، يتم حذفه من اللوحة النشطة وأرشفته بالسيرفر
-            if (confirm(`هل أنت متأكد من إتمام إجراءات الخروج النهائي وأرشفة ملف الطفل: ${patient.name}؟`)) {
-                try {
-                    const res = await fetch(`/api/patients/${patient.id}`, {
-                        method: 'DELETE',
-                        headers: StateManager.getAuthHeaders()
-                    });
-                    if (res.ok) {
-                        StateManager.state.patients = StateManager.state.patients.filter(p => p.id !== patient.id);
-                        await StateManager.saveLocalState();
-                        this.updateDisplay();
-                        EventBus.emit('stateRefreshed', StateManager.state);
-                    }
-                } catch (e) {
-                    alert("فشل إجراء الخروج النهائي، يرجى التحقق من الاتصال بالسيرفر.");
-                }
-            }
+      } else if (s === 2) {
+        wizardData.diagnosis = document.getElementById('admDiagnosis')?.value || '';
+        wizardData.source = document.getElementById('admSource')?.value || 'ER';
+        if (!wizardData.diagnosis) {
+          showToast('⚠️ التشخيص مطلوب', 'error');
+          return;
         }
+      }
+      render(s + 1);
+    };
+
+    this.wizardPrev = (s) => {
+      if (s === 2) {
+        wizardData.diagnosis = document.getElementById('admDiagnosis')?.value || '';
+        wizardData.source = document.getElementById('admSource')?.value || 'ER';
+      } else if (s === 3) {
+        wizardData.history = document.getElementById('admHistory')?.value || '';
+      }
+      render(s - 1);
+    };
+
+    this.wizardSubmit = () => {
+      wizardData.history = document.getElementById('admHistory')?.value || '';
+      const { name, age, weight, height, bed, diagnosis, source, history } = wizardData;
+      if (!name || isNaN(parseFloat(age)) || parseFloat(age) <= 0 || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0 || !bed || !diagnosis) {
+        showToast('⚠️ جميع الحقول المطلوبة يجب تعبئتها بشكل صحيح', 'error');
+        return;
+      }
+      const id = 'temp_' + uid();
+      const newPatient = {
+        id,
+        name,
+        age: parseFloat(age),
+        weight: parseFloat(weight),
+        height: parseFloat(height) || null,
+        bed,
+        diagnosis,
+        status: 'admitted',
+        vitals: '',
+        fluids: '',
+        meds: '',
+        notes: history || '',
+        admissionDate: today(),
+        dischargeDate: null,
+        source,
+        workflowStage: 1,
+        dischargeChecklist: { summary: false, meds: false, followUp: false, education: false, signature: false },
+        vitalsHistory: [],
+        updatedAt: Date.now()
+      };
+
+      const state = stateManager.get();
+      state.patients.push(newPatient);
+      stateManager.save();
+
+      // إضافة إلى طابور المزامنة
+      stateManager.addToQueue('patients', 'POST', newPatient, id);
+
+      // إضافة مهمة تلقائية
+      const taskId = 'temp_' + uid();
+      const newTask = {
+        id: taskId,
+        text: `تقييم كامل لـ ${name}`,
+        priority: 'high',
+        assignee: 'junior',
+        done: false,
+        createdAt: today(),
+        dueDate: today(),
+        dueTime: timeNow(),
+        reminded: false,
+        updatedAt: Date.now()
+      };
+      state.tasks.push(newTask);
+      stateManager.addToQueue('tasks', 'POST', newTask, taskId);
+      stateManager.save();
+
+      closeModal();
+      bus.emit('render');
+      showToast(`✅ تم قبول ${name}`, 'success');
+    };
+
+    render(1);
+  }
+
+  // ─── عرض تفاصيل المريض ───
+  viewPatient(id) {
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    const stageLabels = ['الاستقبال والتقييم', 'وضع الخطة العلاجية', 'التنفيذ والمتابعة', 'الخروج والمتابعة'];
+    const stageEmojis = ['📥', '📋', '⚕️', '🚪'];
+    let html = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <button class="small secondary" onclick="closeModal()">← رجوع</button>
+        <h2 style="margin:0;">${p.name}</h2>
+        <span class="text-muted text-sm">${p.age}س · ${p.weight}كجم</span>
+      </div>
+      <div class="workflow-progress">
+        ${[1,2,3,4].map(s => `
+          <div class="workflow-step">
+            <div class="step-circle ${s === p.workflowStage ? 'active' : s < p.workflowStage ? 'done' : ''}">${s < p.workflowStage ? '✓' : s}</div>
+            <div class="step-label">${stageEmojis[s-1]} ${stageLabels[s-1].split(' ')[0]}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;">
+        <div><b>التشخيص</b><br>${p.diagnosis}</div>
+        <div><b>السرير</b><br>${p.bed}</div>
+        <div><b>الفحوصات</b><br>${p.vitals || '—'}</div>
+        <div><b>الأدوية</b><br>${p.meds || '—'}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">
+        ${this.hasPermission('update_vitals') ? `<button class="small secondary" onclick="ward.updateVitals('${p.id}');closeModal();">📊 فحوصات</button>` : ''}
+        ${this.hasPermission('write_notes') ? `<button class="small secondary" onclick="ward.addNote('${p.id}');closeModal();">📝 ملاحظة</button>` : ''}
+        ${this.hasPermission('approve_plan') && p.workflowStage < 4 ? `<button class="small secondary" onclick="ward.advanceStage('${p.id}');closeModal();">➡️ تقدم</button>` : ''}
+        ${this.hasPermission('discharge') ? `<button class="small danger" onclick="ward.dischargePatient('${p.id}');closeModal();">⬆️ خروج</button>` : ''}
+      </div>
+      <div class="card" style="margin-top:8px;border-right-color:var(--gray);">
+        <div class="title">📝 الملاحظات</div>
+        <div style="font-size:13px;max-height:120px;overflow-y:auto;">${p.notes || 'لا توجد ملاحظات'}</div>
+      </div>
+    `;
+    openModal(html);
+  }
+
+  // ─── تقدم المرحلة ───
+  advanceStage(id) {
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    if (p.workflowStage >= 4) {
+      showToast('⚠️ المريض في المرحلة النهائية', 'warning');
+      return;
     }
+    p.workflowStage = (p.workflowStage || 1) + 1;
+    p.updatedAt = Date.now();
+    stateManager.save();
+    // إضافة إلى طابور المزامنة
+    stateManager.addToQueue('patients', 'PATCH', { workflowStage: p.workflowStage, updatedAt: p.updatedAt }, p.id);
+    bus.emit('render');
+    showToast(`✅ تم تقدم ${p.name} إلى المرحلة ${p.workflowStage}`, 'success');
+  }
 
-    /**
-     * فتح نافذة معالج القبول المكون من 3 خطوات (Admission Wizard Modal)
-     */
-    openAdmissionWizard() {
-        this.currentWizardStep = 1;
-        this.modalOverlay.classList.add('active');
-        this.renderWizardStepContent();
+  // ─── تحديث الفحوصات ───
+  updateVitals(id) {
+    const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
+    if (val === null) return;
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    if (!p.vitalsHistory) p.vitalsHistory = [];
+    p.vitalsHistory.push({ timestamp: new Date().toISOString(), vitals: val });
+    p.vitals = val;
+    p.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('patients', 'PATCH', { vitals: val, vitalsHistory: p.vitalsHistory, updatedAt: p.updatedAt }, p.id);
+    bus.emit('render');
+    showToast('✅ تم تحديث الفحوصات', 'success');
+  }
+
+  // ─── إضافة ملاحظة ───
+  addNote(id) {
+    const note = prompt('أضف ملاحظة سريرية:');
+    if (!note) return;
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    p.notes = (p.notes || '') + '\n' + today() + ' ' + timeNow() + ': ' + note;
+    p.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('patients', 'PATCH', { notes: p.notes, updatedAt: p.updatedAt }, p.id);
+    bus.emit('render');
+    showToast('📝 تم إضافة الملاحظة', 'success');
+  }
+
+  // ─── خروج المريض ───
+  dischargePatient(id) {
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    if (p.workflowStage < 4) {
+      showToast('⚠️ يجب إكمال جميع مراحل سير العمل قبل الخروج', 'error');
+      return;
     }
+    openModal(`
+      <h2>📋 خروج المريض: ${p.name}</h2>
+      <div style="margin:12px 0;background:#f8fafc;padding:12px;border-radius:8px;">
+        <p style="font-size:13px;color:#475569;">يرجى التأكد من استكمال جميع البنود</p>
+      </div>
+      <div style="margin:10px 0;">
+        <label class="check-label"><input type="checkbox" id="dcSummary" ${p.dischargeChecklist?.summary?'checked':''}> ✅ ملخص الخروج</label>
+        <label class="check-label"><input type="checkbox" id="dcMeds" ${p.dischargeChecklist?.meds?'checked':''}> ✅ شرح الأدوية</label>
+        <label class="check-label"><input type="checkbox" id="dcFollow" ${p.dischargeChecklist?.followUp?'checked':''}> ✅ موعد المتابعة</label>
+        <label class="check-label"><input type="checkbox" id="dcEducation" ${p.dischargeChecklist?.education?'checked':''}> ✅ تثقيف المريض</label>
+        <label class="check-label"><input type="checkbox" id="dcSignature" ${p.dischargeChecklist?.signature?'checked':''}> ✅ توقيع الطبيب</label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="ward.saveDischargeChecklist('${p.id}')" class="secondary small">💾 حفظ</button>
+        <button onclick="ward.finalizeDischarge('${p.id}')" class="success" style="flex:1;">✍️ تأكيد الخروج</button>
+      </div>
+    `);
+  }
 
-    renderWizardStepContent() {
-        let stepHtml = '';
+  saveDischargeChecklist(id) {
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    p.dischargeChecklist = {
+      summary: document.getElementById('dcSummary').checked,
+      meds: document.getElementById('dcMeds').checked,
+      followUp: document.getElementById('dcFollow').checked,
+      education: document.getElementById('dcEducation').checked,
+      signature: document.getElementById('dcSignature').checked
+    };
+    p.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('patients', 'PATCH', { dischargeChecklist: p.dischargeChecklist, updatedAt: p.updatedAt }, p.id);
+    showToast('✅ تم حفظ قائمة التدقيق', 'success');
+  }
 
-        if (this.currentWizardStep === 1) {
-            stepHtml = `
-                <h3>👶 قبول طفل جديد - الخطوة 1 (البيانات الأساسية)</h3>
-                <hr style="margin: 12px 0; border-color: var(--border-color);">
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <label>اسم الطفل رباعي:</label>
-                    <input type="text" id="wiz_name" class="role-selector" style="width:100%; text-align:right;" required>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div>
-                            <label>رقم الملف الطبي:</label>
-                            <input type="text" id="wiz_file" class="role-selector" style="width:100%; text-align:right;" required>
-                        </div>
-                        <div>
-                            <label>العمر / تاريخ الميلاد:</label>
-                            <input type="text" id="wiz_age" class="role-selector" style="width:100%; text-align:right;" placeholder="مثال: 3 سنوات" required>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else if (this.currentWizardStep === 2) {
-            stepHtml = `
-                <h3>🩺 قبول طفل جديد - الخطوة 2 (التشخيص السريري)</h3>
-                <hr style="margin: 12px 0; border-color: var(--border-color);">
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <label>التشخيص الأولي (Diagnosis):</label>
-                    <input type="text" id="wiz_diag" class="role-selector" style="width:100%; text-align:right;" placeholder="مثال: Severe Pneumonia" required>
-                    <label>الشكوى الرئيسية والتاريخ الطبي باختصار:</label>
-                    <textarea id="wiz_history" class="role-selector" style="width:100%; height:80px; text-align:right; font-family:inherit;"></textarea>
-                </div>
-            `;
-        } else if (this.currentWizardStep === 3) {
-            stepHtml = `
-                <h3>📊 قبول طفل جديد - الخطوة 3 (العلامات الحيوية الأولية و PEWS)</h3>
-                <hr style="margin: 12px 0; border-color: var(--border-color);">
-                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">سيقوم النظام بحساب درجة خطورة الحالة مؤتمتاً بناءً على هذه المدخلات القياسية.</p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <label>معدل التنفس (Respiratory Rate):</label>
-                        <input type="number" id="wiz_rr" class="role-selector" style="width:100%;" value="24">
-                    </div>
-                    <div>
-                        <label>نبضات القلب (Heart Rate):</label>
-                        <input type="number" id="wiz_hr" class="role-selector" style="width:100%;" value="95">
-                    </div>
-                    <div>
-                        <label>درجة الحرارة (Temp °C):</label>
-                        <input type="number" id="wiz_temp" class="role-selector" style="width:100%;" value="37" step="0.1">
-                    </div>
-                    <div>
-                        <label>الحالة العصبية والوعي:</label>
-                        <select id="wiz_neuro" class="role-selector" style="width:100%;">
-                            <option value="0">واعي ومستجيب بالكامل (Normal)</option>
-                            <option value="1">مستجيب للصوت فقط (Somnolent)</option>
-                            <option value="3">مستجيب للألم فقط أو غائب عن الوعي</option>
-                        </select>
-                    </div>
-                </div>
-            `;
-        }
-
-        // إضافة أزرار التحكم بالمعالج أسفل المحتوى الديناميكي
-        this.modalBox.innerHTML = `
-            <div id="wizard-form-container">${stepHtml}</div>
-            <div style="display: flex; justify-content: space-between; margin-top: 24px;">
-                <button id="wiz_close" class="role-selector">إلغاء</button>
-                <div>
-                    ${this.currentWizardStep > 1 ? '<button id="wiz_back" class="role-selector" style="margin-left:8px;">السابق</button>' : ''}
-                    <button id="wiz_next" class="action-btn-primary">${this.currentWizardStep === 3 ? 'إتمام القبول وحفظ' : 'التالي'}</button>
-                </div>
-            </div>
-        `;
-
-        this.bindWizardControls();
+  finalizeDischarge(id) {
+    const state = stateManager.get();
+    const p = state.patients.find(pt => pt.id === id);
+    if (!p) return;
+    const allChecked = ['dcSummary','dcMeds','dcFollow','dcEducation','dcSignature'].every(el => document.getElementById(el).checked);
+    if (!allChecked) {
+      showToast('⚠️ يجب استكمال جميع بنود القائمة', 'error');
+      return;
     }
-
-    bindWizardControls() {
-        // تخزين البيانات المدخلة مؤقتاً بين الخطوات
-        if (!this.wizardData) this.wizardData = {};
-
-        document.getElementById('wiz_close').addEventListener('click', () => {
-            this.modalOverlay.classList.remove('active');
-            this.wizardData = {};
-        });
-
-        const nextBtn = document.getElementById('wiz_next');
-        const backBtn = document.getElementById('wiz_back');
-
-        if (backBtn) {
-            backBtn.addEventListener('click', () => {
-                this.currentWizardStep--;
-                this.renderWizardStepContent();
-            });
-        }
-
-        nextBtn.addEventListener('click', async () => {
-            // حفظ مدخلات الخطوة الحالية قبل الانتقال
-            if (this.currentWizardStep === 1) {
-                this.wizardData.name = document.getElementById('wiz_name').value;
-                this.wizardData.fileNumber = document.getElementById('wiz_file').value;
-                this.wizardData.age = document.getElementById('wiz_age').value;
-                if (!this.wizardData.name || !this.wizardData.fileNumber) return alert("يرجى ملء الاسم ورقم الملف الحقول إلزامية");
-                this.currentWizardStep = 2;
-                this.renderWizardStepContent();
-            } else if (this.currentWizardStep === 2) {
-                this.wizardData.diagnosis = document.getElementById('wiz_diag').value;
-                this.wizardData.history = document.getElementById('wiz_history').value;
-                if (!this.wizardData.diagnosis) return alert("يرجى تحديد التشخيص الأولي للطفل");
-                this.currentWizardStep = 3;
-                this.renderWizardStepContent();
-            } else if (this.currentWizardStep === 3) {
-                // قراءة وحساب نقاط الـ PEWS آلياً قبل الرفع للشبكة
-                const rr = parseInt(document.getElementById('wiz_rr').value) || 24;
-                const hr = parseInt(document.getElementById('wiz_hr').value) || 95;
-                const neuroScore = parseInt(document.getElementById('wiz_neuro').value) || 0;
-                
-                // دالة سريرية برمجية مبسطة لحساب نقاط الخطورة الافتراضية للإنذار المبكر
-                let calculatedPews = neuroScore;
-                if (rr > 40 || rr < 15) calculatedPews += 2;
-                if (hr > 140 || hr < 60) calculatedPews += 2;
-
-                this.wizardData.vitals = { rr, hr, temp: document.getElementById('wiz_temp').value };
-                this.wizardData.pewsScore = calculatedPews;
-                this.wizardData.isCritical = calculatedPews >= 5;
-
-                // إرسال البيانات الكلية لمدير الحالة المركزي
-                await StateManager.addPatient(this.wizardData);
-                this.modalOverlay.classList.remove('active');
-                this.wizardData = {}; // تصفير الوعاء
-            }
-        });
-    }
-
-    /**
-     * فتح نافذة عرض التفاصيل الكاملة لملف الطفل
-     */
-    openPatientDetailsModal(patient) {
-        this.modalOverlay.classList.add('active');
-        this.modalBox.innerHTML = `
-            <h3>📄 الملف الطبي الشامل للطفل</h3>
-            <hr style="margin: 12px 0; border-color: var(--border-color);">
-            <div style="text-align: right; line-height: 1.8;">
-                <p><strong>الاسم الكامـل:</strong> ${patient.name}</p>
-                <p><strong>رقم الملف:</strong> ${patient.fileNumber} | <strong>العمر:</strong> ${patient.age}</p>
-                <p><strong>التشخيص الحالي:</strong> ${patient.diagnosis}</p>
-                <p><strong>التاريخ المرضي:</strong> ${patient.history || 'لا يوجد ملخص مسجل'}</p>
-                <hr style="margin: 12px 0; border-style: dashed; border-color: var(--border-color);">
-                <p>📊 <strong>مؤشر الإنذار المبكر (PEWS Score):</strong> <span style="font-size:1.1rem; font-weight:700; color:var(--danger-color);">${patient.pewsScore || 0}</span></p>
-                <p>🌡️ <strong>آخر علامات حيوية:</strong> نبض: ${patient.vitals?.hr || '--'} | تنفس: ${patient.vitals?.rr || '--'} | حرارة: ${patient.vitals?.temp || '--'}°C</p>
-            </div>
-            <div style="display:flex; justify-content:flex-end; margin-top:24px;">
-                <button id="closeDetailsModalBtn" class="action-btn-primary">إغلاق الملف</button>
-            </div>
-        `;
-        document.getElementById('closeDetailsModalBtn').addEventListener('click', () => {
-            this.modalOverlay.classList.remove('active');
-        });
-    }
+    if (!confirm(`تأكيد خروج ${p.name}؟`)) return;
+    p.status = 'discharged';
+    p.dischargeDate = today();
+    p.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('patients', 'PATCH', { status: p.status, dischargeDate: p.dischargeDate, updatedAt: p.updatedAt }, p.id);
+    closeModal();
+    bus.emit('render');
+    showToast(`⬆️ تم خروج ${p.name}`, 'success');
+  }
 }
 
-// تهيئة المكون ذاتياً لربط الأحداث باللوحة
-document.addEventListener('DOMContentLoaded', () => {
-    window.WardModule = new WardComponent();
-});
+// تهيئة المكون
+const ward = new WardComponent();
+window.ward = ward;
