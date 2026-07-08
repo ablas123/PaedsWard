@@ -1,16 +1,15 @@
 // ================================================================
 //  مكون لوحة التحكم (Dashboard)
 // ================================================================
+import { getRoleLabel } from '../core/constants.js';
+
 class Dashboard {
   constructor() {
     this.container = document.getElementById('appContent');
     this.tab = 'dashboard';
-    bus.on('switchTab', (tab) => {
-      if (tab === this.tab) this.render();
-    });
-    bus.on('render', () => {
-      if (this.tab === 'dashboard') this.render();
-    });
+
+    bus.on('switchTab', (tab) => { if (tab === this.tab) this.render(); });
+    bus.on('render', () => { if (this.tab === 'dashboard') this.render(); });
     bus.on('stateChanged', () => this.render());
   }
 
@@ -22,7 +21,7 @@ class Dashboard {
     const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
     const total = state.patients.length;
 
-    this.container.innerHTML = `
+    let html = `
       <div class="dashboard">
         <div class="stat-card primary">
           <div class="stat-number">${active}</div>
@@ -61,9 +60,10 @@ class Dashboard {
         ).join('') || '<div class="text-muted">لا توجد مهام معلقة</div>'}
       </div>
     `;
+
+    this.container.innerHTML = html;
   }
 }
 
-// تهيئة المكون
 const dashboard = new Dashboard();
 window.dashboard = dashboard;
