@@ -1,7 +1,7 @@
 {
-  "name": "paedsward-pwa",
-  "version": "2.0.0",
-  "description": "PaedsWard – منظم اليوم الطبي للأطفال (نسخة متكاملة)",
+  "name": "paedsward-advanced",
+  "version": "3.0.0",
+  "description": "PaedsWard – منظم اليوم الطبي (نسخة متكاملة مع مزامنة ذكية)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
