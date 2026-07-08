@@ -1,165 +1,140 @@
-import EventBus from '../core/EventBus.js';
-import StateManager from '../core/StateManager.js';
+// ================================================================
+//  مكون العيادة (Clinic)
+// ================================================================
+class ClinicComponent {
+  constructor() {
+    this.container = document.getElementById('appContent');
+    this.tab = 'clinic';
+    bus.on('switchTab', (tab) => {
+      if (tab === this.tab) this.render();
+    });
+    bus.on('render', () => {
+      if (this.tab === 'clinic') this.render();
+    });
+    bus.on('stateChanged', () => this.render());
+  }
 
-/**
- * ==========================================================================
- * 🗓️ مكون العيادة الخارجية والمواعيد (Outpatient Clinic Component)
- * الوظيفة: حجز ومتابعة مواعيد المراجعة للأطفال بعد الخروج من الجناح
- * ==========================================================================
- */
-export class ClinicComponent {
-    constructor() {
-        this.container = document.getElementById('clinic-view');
-        this.currentSearchQuery = '';
+  render() {
+    const state = stateManager.get();
+    const search = state.searchQuery || '';
+    const slots = state.clinicSlots.filter(s =>
+      s.patientName.includes(search) || s.reason.includes(search)
+    );
 
-        this.init();
-    }
+    let html = `
+      <div class="flex-between mb-8">
+        <h2 style="font-size:18px;">🩺 العيادة</h2>
+        ${this.hasPermission('manage_clinic') ? `<button class="small" onclick="clinic.showAddForm()">➕ إضافة</button>` : ''}
+      </div>
+    `;
 
-    init() {
-        this.renderLayout();
-        this.setupListeners();
-        this.updateDisplay();
-    }
-
-    renderLayout() {
-        this.container.innerHTML = `
-            <div class="view-header">
-                <h2>جدولة مواعيد العيادة الخارجية والمراجعات</h2>
+    if (!slots.length) {
+      html += `<div class="empty-state"><div class="emoji">📋</div><p>${search ? 'لا توجد نتائج بحث' : 'لا توجد مواعيد'}</p></div>`;
+    } else {
+      slots.forEach(s => {
+        html += `
+          <div class="card" style="border-right-color:${s.status === 'مكتمل' ? 'var(--success)' : 'var(--warning)'};">
+            <div class="flex-between">
+              <div>
+                <div class="title">${s.patientName}</div>
+                <div class="sub">⏰ ${s.time} · ${s.age} سنة · ${s.reason}</div>
+              </div>
+              <span class="status-badge ${s.status === 'مكتمل' ? 'completed' : 'waiting'}">${s.status}</span>
             </div>
-
-            <div style="background: var(--bg-card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px;">
-                <h4 style="margin-bottom:12px; color: var(--primary-color);">➕ حجز موعد مراجعة جديد</h4>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px; align-items: end;">
-                    <div>
-                        <label style="font-size:0.85rem; color:var(--text-muted);">اسم الطفل ورقم الملف:</label>
-                        <input type="text" id="clinic_patient_input" class="role-selector" style="width:100%; text-align:right;" placeholder="مثال: أحمد علي - ملف 4055">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85rem; color:var(--text-muted);">التاريخ (Date):</label>
-                        <input type="date" id="clinic_date_input" class="role-selector" style="width:100%;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85rem; color:var(--text-muted);">العيادة التخصصية:</label>
-                        <select id="clinic_type_input" class="role-selector" style="width:100%;">
-                            <option value="general">🩺 العيادة العامة (General)</option>
-                            <option value="neuro">🧠 عيادة الأعصاب (Neurology)</option>
-                            <option value="nutrition">🍼 عيادة التغذية والنمو</option>
-                        </select>
-                    </div>
-                    <button id="submit_appointment_btn" class="action-btn-primary" style="height: 38px;">تأكيد الحجز</button>
-                </div>
-            </div>
-
-            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
-                <h4 style="margin-bottom:14px; color: var(--text-main);">🗓️ المواعيد المجدولة للأيام القادمة</h4>
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;">
-                        <thead>
-                            <tr style="background-color: var(--primary-light); color: var(--primary-color); border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px 8px;">👶 المريض / الملف</th>
-                                <th style="padding: 12px 8px;">📅 التاريخ</th>
-                                <th style="padding: 12px 8px;">🩺 نوع العيادة</th>
-                                <th style="padding: 12px 8px;">🗑️ إجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clinic_appointments_body">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
+            ${this.hasPermission('manage_clinic') ? `
+              <div class="actions">
+                <button class="small secondary" onclick="clinic.updateStatus('${s.id}','مكتمل')">✅ مكتمل</button>
+                <button class="small danger" onclick="clinic.removeSlot('${s.id}')">🗑️</button>
+              </div>
+            ` : ''}
+          </div>
         `;
-
-        document.getElementById('submit_appointment_btn').addEventListener('click', () => this.handleCreateAppointment());
+      });
     }
 
-    setupListeners() {
-        EventBus.on('stateRefreshed', () => this.updateDisplay());
-        EventBus.on('collectionUpdated', () => this.updateDisplay());
+    this.container.innerHTML = html;
+  }
 
-        EventBus.on('globalSearchTriggered', (query) => {
-            this.currentSearchQuery = query;
-            this.updateDisplay();
-        });
+  hasPermission(perm) {
+    const state = stateManager.get();
+    const role = state.currentRole;
+    const ROLES = {
+      senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients'],
+      junior: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals'],
+      nurse: ['update_vitals', 'view_patients', 'complete_tasks'],
+      admin: ['manage_clinic', 'view_patients', 'send_alerts']
+    };
+    return ROLES[role] && ROLES[role].includes(perm);
+  }
+
+  showAddForm() {
+    openModal(`
+      <h2>➕ إضافة موعد جديد</h2>
+      <label>الوقت *</label><input id="clinicTime" type="time" value="${timeNow()}">
+      <label>اسم المريض *</label><input id="clinicName" placeholder="مثال: فاطمة علي">
+      <label>العمر *</label><input id="clinicAge" type="number" placeholder="4">
+      <label>سبب الزيارة *</label><input id="clinicReason" placeholder="مثال: متابعة ربو">
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="clinic.saveSlot()">حفظ</button>
+        <button class="secondary" onclick="closeModal()">إلغاء</button>
+      </div>
+    `);
+  }
+
+  saveSlot() {
+    const time = document.getElementById('clinicTime').value;
+    const name = document.getElementById('clinicName').value.trim();
+    const age = parseInt(document.getElementById('clinicAge').value);
+    const reason = document.getElementById('clinicReason').value.trim();
+
+    if (!time || !name || isNaN(age) || age <= 0 || !reason) {
+      showToast('⚠️ جميع الحقول مطلوبة', 'error');
+      return;
     }
 
-    async handleCreateAppointment() {
-        const patientInput = document.getElementById('clinic_patient_input');
-        const dateInput = document.getElementById('clinic_date_input');
-        const typeSelect = document.getElementById('clinic_type_input');
+    const state = stateManager.get();
+    const newSlot = {
+      id: 'temp_' + uid(),
+      time,
+      patientName: name,
+      age,
+      reason,
+      status: 'انتظار',
+      updatedAt: Date.now()
+    };
 
-        const patientName = patientInput.value.trim();
-        const date = dateInput.value;
-        const clinicType = typeSelect.value;
+    state.clinicSlots.push(newSlot);
+    stateManager.save();
+    stateManager.addToQueue('clinicSlots', 'POST', newSlot, newSlot.id);
 
-        if (!patientName || !date) {
-            alert("يرجى إدخال اسم المريض وتحديد تاريخ الموعد.");
-            return;
-        }
+    closeModal();
+    bus.emit('render');
+    showToast('✅ تمت إضافة الموعد', 'success');
+  }
 
-        const appointmentData = { patientName, date, clinicType };
-        await StateManager.addGenericItem('clinic', appointmentData);
+  updateStatus(id, status) {
+    const state = stateManager.get();
+    const s = state.clinicSlots.find(slot => slot.id === id);
+    if (!s) return;
+    s.status = status;
+    s.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('clinicSlots', 'PATCH', { status, updatedAt: s.updatedAt }, s.id);
+    bus.emit('render');
+    showToast('✅ تم تحديث الحالة', 'success');
+  }
 
-        patientInput.value = '';
-        dateInput.value = '';
-    }
-
-    updateDisplay() {
-        const tbody = document.getElementById('clinic_appointments_body');
-        if (!tbody) return;
-
-        const appointments = StateManager.state.clinic || [];
-        tbody.innerHTML = '';
-
-        if (appointments.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">لا توجد مواعيد مجدولة حالياً.</td></tr>`;
-            return;
-        }
-
-        appointments.forEach(app => {
-            const matchesSearch = !this.currentSearchQuery || app.patientName.toLowerCase().includes(this.currentSearchQuery);
-            if (!matchesSearch) return;
-
-            const row = document.createElement('tr');
-            row.style.borderBottom = `1px solid var(--border-color)`;
-
-            row.innerHTML = `
-                <td style="padding: 12px 8px; font-weight: 600;">${app.patientName}</td>
-                <td style="padding: 12px 8px; color: var(--text-muted);">${app.date}</td>
-                <td style="padding: 12px 8px;"><span style="background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700;">${this.translateClinic(app.clinicType)}</span></td>
-                <td style="padding: 12px 8px;">
-                    <button class="delete-app-btn" style="background:none; border:none; color:var(--danger-color); cursor:pointer; font-size:1rem;">🗑️</button>
-                </td>
-            `;
-
-            row.querySelector('.delete-app-btn').addEventListener('click', async () => {
-                if (confirm("هل تريد إلغাকিং هذا الموعد؟")) {
-                    try {
-                        const res = await fetch(`/api/clinic/${app.id}`, {
-                            method: 'DELETE',
-                            headers: StateManager.getAuthHeaders()
-                        });
-                        if (res.ok) {
-                            StateManager.state.clinic = StateManager.state.clinic.filter(c => c.id !== app.id);
-                            await StateManager.saveLocalState();
-                            this.updateDisplay();
-                            EventBus.emit('stateRefreshed', StateManager.state);
-                        }
-                    } catch (e) {
-                        alert("فشل في حذف الموعد.");
-                    }
-                }
-            });
-
-            tbody.appendChild(row);
-        });
-    }
-
-    translateClinic(type) {
-        const list = { general: 'العيادة العامة', neuro: 'عيادة الأعصاب', nutrition: 'عيادة التغذية والنمو' };
-        return list[type] || type;
-    }
+  removeSlot(id) {
+    if (!confirm('حذف هذا الموعد؟')) return;
+    const state = stateManager.get();
+    const s = state.clinicSlots.find(slot => slot.id === id);
+    state.clinicSlots = state.clinicSlots.filter(slot => slot.id !== id);
+    stateManager.save();
+    if (s) stateManager.addToQueue('clinicSlots', 'DELETE', null, s.id);
+    bus.emit('render');
+    showToast('🗑️ تم حذف الموعد', 'warning');
+  }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.ClinicModule = new ClinicComponent();
-});
+const clinic = new ClinicComponent();
+window.clinic = clinic;
