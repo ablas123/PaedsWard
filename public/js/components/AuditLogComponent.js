@@ -1,16 +1,15 @@
 // ================================================================
 //  مكون سجل التدقيق (Audit Log)
 // ================================================================
+import { getRoleLabel } from '../core/constants.js';
+
 class AuditLog {
   constructor() {
     this.container = document.getElementById('appContent');
     this.tab = 'reports';
-    bus.on('switchTab', (tab) => {
-      if (tab === this.tab) this.render();
-    });
-    bus.on('render', () => {
-      if (this.tab === 'reports') this.render();
-    });
+
+    bus.on('switchTab', (tab) => { if (tab === this.tab) this.render(); });
+    bus.on('render', () => { if (this.tab === 'reports') this.render(); });
     bus.on('stateChanged', () => this.render());
   }
 
@@ -18,14 +17,16 @@ class AuditLog {
     const state = stateManager.get();
     const logs = state.auditLog || [];
 
-    // إحصاءات سريعة
     const totalPatients = state.patients.length;
     const activePatients = state.patients.filter(p => p.status !== 'discharged').length;
     const pendingTasks = state.tasks.filter(t => !t.done).length;
     const totalHandovers = state.handovers.length;
 
     let html = `
-      <h2 style="font-size:18px;margin-bottom:12px;">📊 التقارير وسجل التدقيق</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:18px;margin:0;">📊 التقارير وسجل التدقيق</h2>
+        <button onclick="window.print()" class="secondary small">🖨️ طباعة التقرير</button>
+      </div>
       <div class="dashboard">
         <div class="stat-card primary"><div class="stat-number">${totalPatients}</div><div class="stat-label">🏥 الإجمالي</div></div>
         <div class="stat-card success"><div class="stat-number">${activePatients}</div><div class="stat-label">🩺 نشطون</div></div>
