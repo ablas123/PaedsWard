@@ -1,139 +1,98 @@
-import EventBus from '../core/EventBus.js';
-import StateManager from '../core/StateManager.js';
+// ================================================================
+//  مكون الفريق (Team)
+// ================================================================
+class TeamComponent {
+  constructor() {
+    this.container = document.getElementById('appContent');
+    this.tab = 'team';
+    bus.on('switchTab', (tab) => {
+      if (tab === this.tab) this.render();
+    });
+    bus.on('render', () => {
+      if (this.tab === 'team') this.render();
+    });
+    bus.on('stateChanged', () => this.render());
+  }
 
-/**
- * ==========================================================================
- * 💬 مكون محادثة الفريق الطبي (Team Chat & Messages Component)
- * الوظيفة: تبادل الرسائل والاستشارات الفورية السريعة داخل الجناح الطبي
- * ==========================================================================
- */
-export class TeamComponent {
-    constructor() {
-        this.container = document.getElementById('team-view');
-        this.currentSearchQuery = '';
+  render() {
+    const state = stateManager.get();
+    const search = state.searchQuery || '';
+    const messages = state.teamMessages.filter(m =>
+      m.sender.includes(search) || m.text.includes(search)
+    );
 
-        this.init();
-    }
+    let html = `
+      <div class="flex-between mb-8">
+        <h2 style="font-size:18px;">👥 الفريق</h2>
+        <span class="text-muted">${state.teamMembers.length} أعضاء</span>
+      </div>
+      <div class="member-list">
+        ${state.teamMembers.map(m => `
+          <span class="member">
+            ${getRoleEmoji(m.role)} ${m.name}
+            <span class="role-tag">${getRoleLabel(m.role)}</span>
+            ${m.role === state.currentRole ? '⭐' : ''}
+          </span>
+        `).join('')}
+      </div>
+      <div style="margin:10px 0;">
+        <h3 style="font-size:14px;margin-bottom:4px;">💬 المحادثة</h3>
+      </div>
+    `;
 
-    init() {
-        this.renderLayout();
-        this.setupListeners();
-        this.updateDisplay();
-    }
-
-    renderLayout() {
-        this.container.innerHTML = `
-            <div class="view-header">
-                <h2>لوحة التواصل والمحادثة الفورية للفريق الطبي</h2>
+    if (!messages.length) {
+      html += `<div class="empty-state"><div class="emoji">💬</div><p>${search ? 'لا توجد نتائج بحث' : 'لا توجد رسائل'}</p></div>`;
+    } else {
+      messages.slice().reverse().forEach(m => {
+        html += `
+          <div class="message">
+            <div class="flex-between">
+              <span class="sender">${m.sender}</span>
+              <span class="time">${m.time}</span>
             </div>
-
-            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); height: 75vh; display: flex; flex-direction: column;">
-                <div id="chat_messages_pool" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px;">
-                    </div>
-
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="text" id="chat_msg_input" class="role-selector" style="flex: 1; text-align: right;" placeholder="اكتب رسالة أو استشارة طبية عاجلة للفريق...">
-                    <button id="send_msg_btn" class="action-btn-primary" style="white-space: nowrap;">إرسال 📝</button>
-                </div>
-            </div>
+            <div class="text">${m.text}</div>
+          </div>
         `;
-
-        document.getElementById('send_msg_btn').addEventListener('click', () => this.handleSendMessage());
-        // دعم الإرسال عند ضغط زر Enter للأمان والسرعة
-        document.getElementById('chat_msg_input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleSendMessage();
-        });
+      });
     }
 
-    setupListeners() {
-        EventBus.on('stateRefreshed', () => this.updateDisplay());
-        EventBus.on('collectionUpdated', () => this.updateDisplay());
+    html += `
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <textarea id="teamMsgInput" placeholder="اكتب رسالة..." style="flex:1;min-height:40px;margin:0;"></textarea>
+        <button onclick="team.sendMessage()" style="align-self:flex-end;">إرسال</button>
+      </div>
+    `;
 
-        EventBus.on('globalSearchTriggered', (query) => {
-            this.currentSearchQuery = query;
-            this.updateDisplay();
-        });
-    }
+    this.container.innerHTML = html;
+  }
 
-    async handleSendMessage() {
-        const input = document.getElementById('chat_msg_input');
-        const text = input.value.trim();
+  sendMessage() {
+    const input = document.getElementById('teamMsgInput');
+    if (!input) return;
+    const msg = input.value.trim();
+    if (!msg) return;
 
-        if (!text) return;
+    const state = stateManager.get();
+    const sender = state.teamMembers.find(m => m.role === state.currentRole)?.name || getRoleLabel(state.currentRole);
 
-        const msgData = {
-            text,
-            sender: StateManager.currentUserName,
-            senderRole: StateManager.currentUserRole
-        };
+    const newMsg = {
+      id: 'temp_' + uid(),
+      sender: sender,
+      text: msg,
+      time: timeNow(),
+      read: false,
+      updatedAt: Date.now()
+    };
 
-        await StateManager.addGenericItem('messages', msgData);
-        input.value = '';
-    }
+    state.teamMessages.push(newMsg);
+    stateManager.save();
+    stateManager.addToQueue('teamMessages', 'POST', newMsg, newMsg.id);
 
-    updateDisplay() {
-        const pool = document.getElementById('chat_messages_pool');
-        if (!pool) return;
-
-        const messages = StateManager.state.messages || [];
-        pool.innerHTML = '';
-
-        if (messages.length === 0) {
-            pool.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:40px;">لا توجد رسائل متبادلة اليوم. ابدأ التواصل الآن!</p>`;
-            return;
-        }
-
-        // عرض الرسائل مرتبة زمنياً من الأقدم للأحدث داخل الوعاء لسهولة القراءة المتسلسلة
-        const chronologicalMessages = [...messages].reverse();
-
-        chronologicalMessages.forEach(msg => {
-            const matchesSearch = !this.currentSearchQuery || msg.text.toLowerCase().includes(this.currentSearchQuery);
-            if (!matchesSearch) return;
-
-            const isMe = msg.sender === StateManager.currentUserName;
-
-            const msgWrapper = document.createElement('div');
-            msgWrapper.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: ${isMe ? 'flex-start' : 'flex-end'};
-                width: 100%;
-            `;
-
-            const bubble = document.createElement('div');
-            bubble.style.cssText = `
-                max-width: 70%;
-                padding: 10px 14px;
-                border-radius: 8px;
-                background-color: ${isMe ? 'var(--primary-light)' : '#f3f4f6'};
-                border-right: 3px solid ${isMe ? 'var(--primary-color)' : 'var(--text-muted)'};
-                text-align: right;
-            `;
-
-            const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' }) : '';
-
-            bubble.innerHTML = `
-                <div style="font-size: 0.75rem; font-weight: 700; color: var(--primary-color); margin-bottom: 4px;">
-                    ${msg.sender} (${this.translateRole(msg.senderRole)})
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-main); word-break: break-word;">${msg.text}</div>
-                <div style="font-size: 0.65rem; color: var(--text-muted); text-align: left; margin-top: 4px;">${time}</div>
-            `;
-
-            msgWrapper.appendChild(bubble);
-            pool.appendChild(msgWrapper);
-        });
-
-        // النزول التلقائي لأسفل المحادثة لمشاهدة الرسائل الجديدة فوراً
-        pool.scrollTop = pool.scrollHeight;
-    }
-
-    translateRole(role) {
-        const roles = { nurse: 'تمريض', junior: 'طبيب مقيم', senior: 'أخصائي/استشاري', admin: 'مشرف' };
-        return roles[role] || role;
-    }
+    input.value = '';
+    bus.emit('render');
+    showToast('💬 تم إرسال الرسالة', 'success');
+  }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.TeamModule = new TeamComponent();
-});
+const team = new TeamComponent();
+window.team = team;
