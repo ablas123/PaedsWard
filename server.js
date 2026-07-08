@@ -1,161 +1,132 @@
-const express = require('express');
-const cors = require('cors');
-const Database = require('better-sqlite3');
-const cron = require('node-cron');
-const fs = require('fs');
-const path = require('path');
-
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public')); // لتقديم ملفات الواجهة
-
-// ============================================================
-//  1. قاعدة بيانات SQLite (تكتب على القرص، لا تستهلك RAM)
-// ============================================================
-const db = new Database('paedsward.db');
-
-// إنشاء الجداول (بنفس هيكل التطبيق)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS patients (
-    id TEXT PRIMARY KEY, name TEXT, age REAL, weight REAL, bed TEXT,
-    diagnosis TEXT, status TEXT, vitals TEXT, fluids TEXT, meds TEXT,
-    notes TEXT, admissionDate TEXT, dischargeDate TEXT, updatedAt INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY, text TEXT, priority TEXT, assignee TEXT,
-    done INTEGER DEFAULT 0, createdAt TEXT, updatedAt INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS handovers (
-    id TEXT PRIMARY KEY, date TEXT, author TEXT, situation TEXT,
-    background TEXT, assessment TEXT, recommendation TEXT,
-    urgent INTEGER DEFAULT 0, acknowledged INTEGER DEFAULT 0, updatedAt INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS clinicSlots (
-    id TEXT PRIMARY KEY, time TEXT, patientName TEXT, age INTEGER,
-    reason TEXT, status TEXT, updatedAt INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS teamMessages (
-    id TEXT PRIMARY KEY, sender TEXT, text TEXT, time TEXT,
-    read INTEGER DEFAULT 0, updatedAt INTEGER
-  );
-`);
-
-// دوال مساعدة لتحويل القيم (Boolean <-> Integer)
-const toBool = (v) => !!v;
-const rowMapper = (row) => ({
-  ...row,
-  done: toBool(row.done),
-  urgent: toBool(row.urgent),
-  acknowledged: toBool(row.acknowledged),
-  read: toBool(row.read)
-});
-
-// ============================================================
-//  2. نقاط النهاية (API) - خفيفة وسريعة
-// ============================================================
-
-// جلب كل البيانات دفعة واحدة (لتقليل عدد الطلبات)
-app.get('/api/state', (req, res) => {
-  try {
-    const state = {
-      patients: db.prepare('SELECT * FROM patients').all().map(rowMapper),
-      tasks: db.prepare('SELECT * FROM tasks').all().map(rowMapper),
-      handovers: db.prepare('SELECT * FROM handovers').all().map(rowMapper),
-      clinicSlots: db.prepare('SELECT * FROM clinicSlots').all().map(rowMapper),
-      teamMessages: db.prepare('SELECT * FROM teamMessages').all().map(rowMapper)
-    };
-    res.json(state);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// استقبال التحديثات من الواجهة (كتابة على القرص)
-app.post('/api/sync/:collection', (req, res) => {
-  const { collection } = req.params;
-  const data = req.body;
-  
-  // التحقق من صحة اسم المجموعة (أمان)
-  const validCollections = ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMessages'];
-  if (!validCollections.includes(collection)) {
-    return res.status(400).json({ error: 'Invalid collection' });
-  }
-
-  try {
-    // حذف القديم وإعادة الإدراج (حل تعارضات بسيط وفعال)
-    db.prepare(`DELETE FROM ${collection}`).run();
-    
-    if (data.length > 0) {
-      // الحصول على أسماء الأعمدة من أول عنصر
-      const columns = Object.keys(data[0]);
-      const placeholders = columns.map(() => '?').join(',');
-      const insertStmt = db.prepare(`INSERT INTO ${collection} (${columns.join(',')}) VALUES (${placeholders})`);
-      
-      // استخدام المعاملات لتحسين الأداء
-      const insertMany = db.transaction((items) => {
-        for (const item of items) {
-          const values = columns.map(col => item[col] !== undefined ? item[col] : null);
-          insertStmt.run(values);
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PaedsWard - الحل النهائي</title>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-      });
-      
-      insertMany(data);
-    }
-    
-    res.json({ success: true, count: data.length });
-  } catch (e) {
-    console.error('Sync error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background: #f1f5f9;
+            padding: 16px;
+            max-width: 500px;
+            margin: auto;
+        }
+        .header {
+            background: #1a73e8;
+            color: white;
+            padding: 16px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-bar {
+            background: #e2e8f0;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .status-bar .online {
+            color: #22c55e;
+        }
+        .status-bar .offline {
+            color: #ef4444;
+        }
+        .content {
+            background: white;
+            padding: 16px;
+            min-height: 60vh;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .card {
+            background: #f8fafc;
+            border-right: 4px solid #1a73e8;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+        }
+        .card .title {
+            font-weight: 700;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:active {
+            transform: scale(0.96);
+        }
+        button.secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            z-index: 999;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .flex {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        input,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            margin: 4px 0;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
 
-// نقطة إيقاظ (Ping) - لمنع النوم
-app.get('/api/ping', (req, res) => {
-  res.json({ status: 'awake', time: new Date().toISOString() });
-});
+    <div id="app">
+        <div class="header">
+            <span style="font-size:20px;font-weight:800;">🏥 PaedsWard</span>
+            <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:30px;">حقيقي + ذكي</span>
+        </div>
 
-// ============================================================
-//  3. النسخ الاحتياطي التلقائي (كل 6 ساعات)
-// ============================================================
-if (!fs.existsSync('./backups')) fs.mkdirSync('./backups');
+        <div class="status-bar">
+            <span id="statusText">⏳ جاري التحميل...</span>
+            <span>
+                <span id="syncIndicator" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
+                <span id="syncLabel" style="font-size:11px;">محلي</span>
+            </span>
+        </div>
 
-cron.schedule('0 */6 * * *', () => {
-  console.log('🔄 بدء النسخ الاحتياطي التلقائي...');
-  try {
-    const state = {
-      patients: db.prepare('SELECT * FROM patients').all(),
-      tasks: db.prepare('SELECT * FROM tasks').all(),
-      handovers: db.prepare('SELECT * FROM handovers').all(),
-      clinicSlots: db.prepare('SELECT * FROM clinicSlots').all(),
-      teamMessages: db.prepare('SELECT * FROM teamMessages').all(),
-      exportedAt: new Date().toISOString()
-    };
-    
-    const filename = `backup_${Date.now()}.json`;
-    const filePath = path.join('./backups', filename);
-    fs.writeFileSync(filePath, JSON.stringify(state, null, 2));
-    
-    // الاحتفاظ بآخر 10 نسخ فقط (توفير المساحة)
-    const files = fs.readdirSync('./backups').sort();
-    if (files.length > 10) {
-      const toDelete = files.slice(0, files.length - 10);
-      for (const f of toDelete) {
-        fs.unlinkSync(path.join('./backups', f));
-      }
-    }
-    console.log('✅ تم حفظ النسخة:', filename);
-  } catch (e) {
-    console.error('❌ فشل النسخ الاحتياطي:', e);
-  }
-});
+        <div class="content" id="content">
+            <p>جاري تحميل البيانات...</p>
+        </div>
 
-// ============================================================
-//  4. تشغيل الخادم
-// ============================================================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📂 Database: ${path.resolve('paedsward.db')}`);
-  console.log(`📂 Backups: ${path.resolve('./backups')}`);
-});
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button onclick="syncNow()">🔄 مزامنة الآن</button>
+            <button class="secondary" onclick="addDemoPatient()">➕ إضافة مريض تجريبي</button>
+            <button class="secondary" onclick="exportData
