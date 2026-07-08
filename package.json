@@ -1,7 +1,7 @@
 {
   "name": "paedsward-pwa",
-  "version": "1.0.0",
-  "description": "PaedsWard – Offline-First PWA with Render Sync",
+  "version": "2.0.0",
+  "description": "PaedsWard – منظم اليوم الطبي للأطفال (نسخة متكاملة)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
