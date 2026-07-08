@@ -1,7 +1,7 @@
 {
-  "name": "paedsward-advanced",
-  "version": "3.0.0",
-  "description": "PaedsWard – منظم اليوم الطبي (نسخة متكاملة مع مزامنة ذكية)",
+  "name": "paedsward-pro",
+  "version": "5.0.0",
+  "description": "PaedsWard – النظام المتكامل لإدارة الأجنحة الطبية للأطفال",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
