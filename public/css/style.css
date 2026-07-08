@@ -1,492 +1,240 @@
-/* ==========================================================================
-   🎨 المتغيرات الرئيسية والخطوط (CSS Variables & Global Reset)
-   ========================================================================== */
+/* ================================================================
+   PaedsWard – التصميم الاحترافي
+   ================================================================ */
 :root {
-    --primary-color: #1e3a8a;      /* أزرق ملكي للأجنحة الطبية */
-    --primary-light: #eff6ff;     /* خلفية زرقاء خفيفة */
-    --accent-color: #0ea5e9;      /* أزرق سماوي للمؤشرات */
-    --success-color: #10b981;     /* أخضر للحالات المستقرة والمكتملة */
-    --warning-color: #f59e0b;     /* برتقالي للملاحظات والتحذيرات */
-    --danger-color: #ef4444;      /* أحمر للحالات الحرجة والخطيرة (PEWS) */
-    --text-main: #1f2937;         /* لون النصوص الأساسي */
-    --text-muted: #6b7280;        /* لون النصوص الثانوية */
-    --border-color: #e5e7eb;      /* لون الحواف الموحد */
-    --bg-main: #f9fafb;           /* خلفية التطبيق الكلية */
-    --bg-card: #ffffff;           /* خلفية البطاقات والنوافذ */
-    --radius: 12px;               /* انحناء الحواف القياسي */
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    --transition: all 0.25s ease-in-out;
+  --primary: #1a73e8;
+  --primary-dark: #0b3d91;
+  --primary-light: #e8f0fe;
+  --secondary: #6c63ff;
+  --success: #22c55e;
+  --danger: #e53935;
+  --warning: #f59e0b;
+  --gray: #94a3b8;
+  --dark: #1e293b;
+  --radius: 12px;
+  --shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --transition: 0.25s ease;
+  --font: 'Cairo', system-ui, sans-serif;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    overflow-x: hidden;
-    line-height: 1.6;
+  font-family: var(--font);
+  background: #f1f5f9;
+  direction: rtl;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--dark);
 }
 
-/* ==========================================================================
-   📋 شريط القيادة العلوي والـ Dashboard (Header Section)
-   ========================================================================== */
-.app-header {
-    background-color: var(--bg-card);
-    border-bottom: 1px solid var(--border-color);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    box-shadow: var(--shadow);
+.app {
+  max-width: 500px;
+  margin: 0 auto;
+  background: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 30px rgba(0,0,0,0.05);
 }
 
-.header-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 24px;
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.brand h1 {
-    font-size: 1.3rem;
-    color: var(--primary-color);
-    font-weight: 700;
-}
-
-.version-badge {
-    font-size: 0.75rem;
-    background-color: var(--primary-light);
-    color: var(--primary-color);
-    padding: 2px 8px;
+@media (min-width: 501px) {
+  .app {
+    max-width: 600px;
+    min-height: 90vh;
+    height: 95vh;
     border-radius: 20px;
-    vertical-align: middle;
-}
-
-/* شريط البحث العالمي */
-.search-container {
-    position: relative;
-    width: 40%;
-    max-width: 500px;
-}
-
-.search-container input {
-    width: 100%;
-    padding: 10px 40px 10px 16px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    background-color: var(--bg-main);
-    font-size: 0.9rem;
-    outline: none;
-    transition: var(--transition);
-}
-
-.search-container input:focus {
-    border-color: var(--accent-color);
-    background-color: var(--bg-card);
-    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
-}
-
-.search-container .search-icon {
-    position: absolute;
-    top: 50%;
-    right: 14px;
-    transform: translateY(-50%);
-    font-size: 1rem;
-    pointer-events: none;
-}
-
-/* التحكم بالمستخدم والاتصال */
-.user-status-area {
+    margin: 20px auto;
+  }
+  body {
     display: flex;
     align-items: center;
-    gap: 14px;
-}
-
-.status-indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background-color: var(--danger-color);
-    transition: var(--transition);
-}
-
-.status-indicator.online {
-    background-color: var(--success-color);
-    box-shadow: 0 0 8px var(--success-color);
-}
-
-.role-selector {
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    background-color: var(--bg-card);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    outline: none;
-    cursor: pointer;
-}
-
-/* لوحة الإحصائيات السريعة الإجمالية */
-.quick-dashboard {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    padding: 10px 24px;
-    background-color: var(--primary-light);
-    border-top: 1px solid rgba(30, 58, 138, 0.05);
-}
-
-.stat-card {
-    background-color: var(--bg-card);
-    padding: 10px 16px;
-    border-radius: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-right: 4px solid var(--primary-color);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-
-.stat-card[data-type="critical"] { border-right-color: var(--danger-color); }
-.stat-card[data-type="tasks"] { border-right-color: var(--warning-color); }
-.stat-card[data-type="handover"] { border-right-color: var(--accent-color); }
-
-.stat-label {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.stat-value {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-main);
-}
-
-/* ==========================================================================
-   🏗️ الحاوية الرئيسية ونظام القوائم الجانبية والسفلية (Responsive Container)
-   ========================================================================== */
-.app-container {
-    display: flex;
-    margin-top: 140px; /* يعطي مساحة للهيدر والداشبورد العلوي الثابت */
-    min-height: calc(100vh - 140px);
-}
-
-/* القائمة الجانبية للشاشات الكبيرة */
-.app-navigation {
-    width: 260px;
-    background-color: var(--bg-card);
-    border-left: 1px solid var(--border-color);
-    padding: 24px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    position: fixed;
-    top: 140px;
-    bottom: 0;
-    right: 0;
-    overflow-y: auto;
-}
-
-.nav-btn {
-    width: 100%;
-    padding: 12px 16px;
-    border: none;
-    background: none;
-    border-radius: var(--radius);
-    text-align: right;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.nav-btn:hover {
-    background-color: var(--primary-light);
-    color: var(--primary-color);
-}
-
-.nav-btn.active {
-    background-color: var(--primary-color);
-    color: #ffffff;
-}
-
-/* مساحة عرض المحتوى والمكونات */
-.app-content {
-    flex: 1;
-    margin-right: 260px; /* تفادي الاندماج مع الناف بار الجانبي الثابت */
-    padding: 24px;
-    overflow-y: auto;
-}
-
-.view-section {
-    display: none;
-}
-
-.view-section.active-view {
-    display: block;
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-.view-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-
-.view-header h2 {
-    font-size: 1.4rem;
-    color: var(--primary-color);
-}
-
-/* ==========================================================================
-   🏥 جناح الأطفال وسير العمل ذو الـ 4 مراحل (Ward & Workflow)
-   ========================================================================== */
-.ward-stages-container {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    align-items: start;
-}
-
-.ward-stage-column {
-    background-color: #f3f4f6;
-    border-radius: var(--radius);
-    padding: 14px;
-    border-top: 4px solid var(--text-muted);
-    min-height: 500px;
-}
-
-.ward-stage-column[data-stage="1"] { border-top-color: var(--accent-color); }
-.ward-stage-column[data-stage="2"] { border-top-color: var(--warning-color); }
-.ward-stage-column[data-stage="3"] { border-top-color: var(--primary-color); }
-.ward-stage-column[data-stage="4"] { border-top-color: var(--success-color); }
-
-.stage-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    margin-bottom: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.stage-count {
-    background-color: rgba(0,0,0,0.06);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-}
-
-/* بطاقة الطفل الطبية داخل الأجنحة */
-.patient-card {
-    background-color: var(--bg-card);
-    border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    border-right: 4px solid var(--text-muted);
-    transition: var(--transition);
-    cursor: pointer;
-}
-
-.patient-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-}
-
-.patient-card.pews-high {
-    border-right-color: var(--danger-color);
-    background-color: linear-gradient(to left, rgba(239, 68, 68, 0.05), #ffffff);
-}
-
-.patient-card.pews-warn { border-right-color: var(--warning-color); }
-.patient-card.pews-normal { border-right-color: var(--success-color); }
-
-.patient-card h4 {
-    font-size: 0.95rem;
-    margin-bottom: 6px;
-}
-
-.patient-meta {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-/* ==========================================================================
-   ⏹️ الأزرار والنوافذ التنبيهية (Buttons, Modals & Toasts)
-   ========================================================================== */
-.action-btn-primary {
-    background-color: var(--primary-color);
-    color: #ffffff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: var(--radius);
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.action-btn-primary:hover {
-    background-color: #1d4ed8;
-}
-
-/* النوافذ العائمة التراكبية */
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    display: none;
     justify-content: center;
-    align-items: center;
-    z-index: 1000;
+    background: #dce3ed;
+    min-height: 100vh;
+  }
 }
 
-.modal-overlay.active { display: flex; }
-
-.modal-box {
-    background-color: var(--bg-card);
-    width: 90%;
-    max-width: 650px;
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    max-height: 85vh;
-    overflow-y: auto;
-    animation: slideUp 0.25s ease-out;
+/* ─── Header ─── */
+#appHeader {
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 0 0 20px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+#appHeader .brand {
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+#appHeader .brand small {
+  font-weight: 400;
+  font-size: 10px;
+  opacity: 0.8;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.header-actions select {
+  background: rgba(255,255,255,0.18);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 30px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  direction: rtl;
+  backdrop-filter: blur(4px);
+}
+.header-actions select option {
+  background: var(--dark);
+  color: white;
+}
+.header-actions button {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.header-actions button:active {
+  transform: scale(0.95);
+}
+#adminBtn {
+  background: #fbbf24;
+  color: var(--dark);
+  display: none;
+}
+#adminBtn.visible {
+  display: inline-block;
+}
+.sync-status {
+  font-size: 12px;
+  background: rgba(255,255,255,0.15);
+  padding: 2px 10px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sync-status .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.sync-status .dot.online {
+  background: #4ade80;
+}
+.sync-status .dot.offline {
+  background: #f87171;
 }
 
-/* حاوية التنبيهات Toast */
-.toast-container {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 2000;
+/* ─── Toast Container ─── */
+#toastContainer {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 90%;
+  max-width: 400px;
+  pointer-events: none;
+}
+.toast-item {
+  background: var(--dark);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: auto;
+  animation: slideDown 0.3s ease;
+  transition: opacity 0.3s;
+}
+.toast-item.success {
+  background: var(--success);
+}
+.toast-item.error {
+  background: var(--danger);
+}
+.toast-item.warning {
+  background: var(--warning);
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.toast {
-    background-color: var(--text-main);
-    color: #ffffff;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-    animation: slideInLeft 0.3s forwards;
+/* ─── Modal ─── */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15,23,42,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 12px;
+}
+.modal.hidden {
+  display: none;
+}
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 16px 18px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  animation: modalSlide 0.3s ease;
+}
+@keyframes modalSlide {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.modal-content h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.modal-content h3 {
+  font-size: 15px;
+  margin: 10px 0 4px;
+  color: #475569;
 }
 
-.toast.success { background-color: var(--success-color); }
-.toast.danger { background-color: var(--danger-color); }
-
-/* ==========================================================================
-   📱 الاستجابة التامة للهواتف والشاشات الصغيرة (Media Queries)
-   ========================================================================== */
-
-/* للشاشات المتوسطة والأجهزة اللوحية أقل من 1024 بكسل */
-@media (max-width: 1024px) {
-    .ward-stages-container {
-        grid-template-columns: repeat(2, 1fr); /* تظهر على عمودين */
-    }
-}
-
-/* للهواتف الذكية أقل من 768 بكسل */
-@media (max-width: 768px) {
-    .header-main {
-        flex-wrap: wrap;
-        gap: 12px;
-        padding: 10px 14px;
-    }
-    
-    .search-container {
-        width: 100%;
-        order: 3; /* دفع شريط البحث ليكون تحت الاسم والاختيار لحماية التناسق */
-    }
-
-    .quick-dashboard {
-        grid-template-columns: repeat(2, 1fr); /* عمودين بدلاً من أربعة للإحصائيات */
-        padding: 8px 14px;
-    }
-
-    .app-container {
-        margin-top: 220px; /* مساحة الهيدر المتسع على الموبايل */
-        min-height: calc(100vh - 220px);
-        margin-bottom: 60px; /* مساحة الناف بار السفلي */
-    }
-
-    /* تحويل الملاحة إلى تبويبات سفلية مريحة (Bottom Navigation Tab bar) */
-    .app-navigation {
-        flex-direction: row;
-        width: 100%;
-        height: 60px;
-        position: fixed;
-        top: auto;
-        bottom: 0;
-        left: 0; right: 0;
-        padding: 0;
-        border-left: none;
-        border-top: 1px solid var(--border-color);
-        box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.05);
-        overflow-x: auto;
-        white-space: nowrap;
-        z-index: 999;
-    }
-
-    .nav-btn {
-        flex: 1;
-        text-align: center;
-        padding: 0 12px;
-        font-size: 0.8rem;
-        border-radius: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .app-content {
-        margin-right: 0; /* إلغاء الهامش الأيمن للموبايل */
-        padding: 14px;
-    }
-
-    .ward-stages-container {
-        grid-template-columns: 1fr; /* عمود واحد فقط يتصفحه الطبيب للأسفل بسلاسة */
-    }
-}
-
-/* ==========================================================================
-   🎬 المؤثرات الحركية (Keyframes Animations)
-   ========================================================================== */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-@keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}
-@keyframes slideInLeft {
-    from { transform: translateX(-100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
+/* ─── باقي العناصر (بطاقات، أزرار، نماذج، إلخ) ─── */
+/* تم تضمينها في المكونات لكن يمكن إضافة عامة هنا */
