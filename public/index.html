@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PaedsWard - الحل النهائي</title>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background: #f1f5f9;
+            padding: 16px;
+            max-width: 500px;
+            margin: auto;
+        }
+        .header {
+            background: #1a73e8;
+            color: white;
+            padding: 16px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-bar {
+            background: #e2e8f0;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .status-bar .online {
+            color: #22c55e;
+        }
+        .status-bar .offline {
+            color: #ef4444;
+        }
+        .content {
+            background: white;
+            padding: 16px;
+            min-height: 60vh;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .card {
+            background: #f8fafc;
+            border-right: 4px solid #1a73e8;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+        }
+        .card .title {
+            font-weight: 700;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:active {
+            transform: scale(0.96);
+        }
+        button.secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            z-index: 999;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .flex {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            margin: 4px 0;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <div class="header">
+            <span style="font-size:20px;font-weight:800;">🏥 PaedsWard</span>
+            <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:30px;">حقيقي + ذكي</span>
+        </div>
+
+        <div class="status-bar">
+            <span id="statusText">⏳ جاري التحميل...</span>
+            <span>
+                <span id="syncIndicator" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
+                <span id="syncLabel" style="font-size:11px;">محلي</span>
+            </span>
+        </div>
+
+        <div class="content" id="content">
+            <p>جاري تحميل البيانات...</p>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button onclick="syncNow()">🔄 مزامنة الآن</button>
+            <button class="secondary" onclick="addDemoPatient()">➕ إضافة مريض تجريبي</button>
+            <button class="secondary" onclick="exportData()">📤 تصدير</button>
+            <button class="secondary" onclick="document.getElementById('importFile').click()">📥 استيراد</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  1. إعداد IndexedDB (تخزين محلي قوي، لا يستهلك RAM)
+        // ============================================================
+        const store = localforage.createInstance({ name: 'PaedsWard', storeName: 'state' });
+
+        let state = { patients: [], tasks: [], handovers: [], clinicSlots: [], teamMessages: [] };
+        let isSyncing = false;
+        let retryTimeout = null;
+
+        // ============================================================
+        //  2. دوال مساعدة
+        // ============================================================
+        function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+        function today() { return new Date().toISOString().split('T')[0]; }
+
+        function showToast(msg, isError = false) {
+            const old = document.querySelector('.toast');
+            if (old) old.remove();
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.textContent = msg;
+            if (isError) el.style.background = '#ef4444';
+            document.body.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0';
+                setTimeout(() => el.remove(), 300); }, 3000);
+        }
+
+        function updateStatus(text, isOnline) {
+            document.getElementById('statusText').textContent = text;
+            const dot = document.getElementById('syncIndicator');
+            const label = document.getElementById('syncLabel');
+            if (isOnline) {
+                dot.style.background = '#22c55e';
+                label.textContent = 'متصل';
+            } else {
+                dot.style.background = '#f59e0b';
+                label.textContent = 'محلي (غير متصل)';
+            }
+        }
+
+        // ============================================================
+        //  3. تحميل البيانات محلياً (فوري)
+        // ============================================================
+        async function loadLocalState() {
+            try {
+                const saved = await store.getItem('state');
+                if (saved) {
+                    state = saved;
+                    render();
+                    updateStatus(`📱 محلي (آخر تحديث: ${new Date().toLocaleTimeString()})`, false);
+                } else {
+                    // بيانات افتراضية للمرة الأولى
+                    state = {
+                        patients: [
+                            { id: 'p1', name: 'نور الهاشمي', age: 3, weight: 14, bed: 'PICU-2', diagnosis: 'التهاب القصيبات',
+                                status: 'نشط', vitals: 'T:37.8', fluids: '', meds: '', notes: '', admissionDate: today(),
+                                dischargeDate: null, updatedAt: Date.now() }
+                        ],
+                        tasks: [
+                            { id: 't1', text: 'مراجعة نتائج نور', priority: 'عالية', assignee: 'senior', done: false,
+                                createdAt: today(), updatedAt: Date.now() }
+                        ],
+                        handovers: [],
+                        clinicSlots: [],
+                        teamMessages: []
+                    };
+                    await store.setItem('state', state);
+                    render();
+                    updateStatus('📱 بيانات افتراضية', false);
+                }
+            } catch (e) {
+                console.error('فشل تحميل المحلي:', e);
+                updateStatus('⚠️ خطأ في التحميل', false);
+            }
+            // بدء التحديث الخلفي
+            setTimeout(syncInBackground, 500);
+        }
+
+        // ============================================================
+        //  4. التحديث الخلفي (Background Sync مع إعادة محاولة ذكية)
+        // ============================================================
+        async function syncInBackground() {
+            if (isSyncing) return;
+            isSyncing = true;
+            updateStatus('🔄 جاري المزامنة...', false);
+
+            try {
+                const response = await fetch('/api/state');
+                if (!response.ok) throw new Error('Server not reachable');
+
+                const remote = await response.json();
+                let changed = false;
+
+                // دمج البيانات (الأحدث يحل محل القديم)
+                for (const key of ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMessages']) {
+                    if (remote[key] && remote[key].length > 0) {
+                        // مقارنة بسيطة: إذا كان الطول مختلفاً أو التوقيت أحدث
+                        if (remote[key].length !== state[key].length) {
+                            state[key] = remote[key];
+                            changed = true;
+                        } else {
+                            // تحقق من وجود تحديثات (باستخدام updatedAt)
+                            const localLatest = state[key].reduce((max, item) => item.updatedAt > max ? item.updatedAt : max,
+                            0);
+                            const remoteLatest = remote[key].reduce((max, item) => item.updatedAt > max ? item.updatedAt :
+                                max, 0);
+                            if (remoteLatest > localLatest) {
+                                state[key] = remote[key];
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+
+                if (changed) {
+                    await store.setItem('state', state);
+                    render();
+                    showToast('✅ تم تحديث البيانات من الخادم');
+                }
+
+                updateStatus(`✅ متزامن (${new Date().toLocaleTimeString()})`, true);
+
+            } catch (error) {
+                console.warn('⚠️ الخادم غير متاح (نائم أو غير متصل):', error.message);
+                updateStatus('⚠️ وضع غير متصل (بيانات محلية)', false);
+                // إعادة المحاولة بعد 30 ثانية (آلية ذكية)
+                if (retryTimeout) clearTimeout(retryTimeout);
+                retryTimeout = setTimeout(syncInBackground, 30000);
+            } finally {
+                isSyncing = false;
+            }
+        }
+
+        // ============================================================
+        //  5. حفظ التغييرات (محلياً + رفع للخادم في الخلفية)
+        // ============================================================
+        async function saveAndSync(collection, newData) {
+            // تحديث الحالة المحلية
+            state[collection] = newData;
+            // إضافة updatedAt لكل عنصر
+            state[collection] = state[collection].map(item => ({ ...item, updatedAt: Date.now() }));
+
+            // حفظ في IndexedDB فوراً (الواجهة تتغير بسرعة)
+            await store.setItem('state', state);
+            render();
+            showToast('💾 تم الحفظ محلياً');
+
+            // محاولة رفع التغيير للخادم في الخلفية
+            try {
+                const response = await fetch(`/api/sync/${collection}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state[collection])
+                });
+                if (!response.ok) throw new Error('فشل الرفع');
+                showToast('☁️ تم رفع البيانات للخادم');
+                // بعد رفع ناجح، نحدث حالة المزامنة
+                updateStatus(`✅ متزامن (${new Date().toLocaleTimeString()})`, true);
+            } catch (e) {
+                console.warn('⚠️ الخادم غير متاح، البيانات محفوظة محلياً. سيتم إعادة المحاولة...');
+                // جدولة إعادة محاولة بعد دقيقة
+                if (retryTimeout) clearTimeout(retryTimeout);
+                retryTimeout = setTimeout(syncInBackground, 60000);
+            }
+        }
+
+        // ============================================================
+        //  6. دوال التصيير (Render)
+        // ============================================================
+        function render() {
+            const container = document.getElementById('content');
+            let html = `
+                <div style="margin-bottom:12px;">
+                    <span style="font-weight:700;">👥 المرضى:</span> ${state.patients.length}
+                    <span style="margin-right:12px;font-weight:700;">📋 المهام:</span> ${state.tasks.filter(t=>!t.done).length}
+                </div>
+                <h3 style="margin:12px 0 8px;">🩺 قائمة المرضى</h3>
+            `;
+
+            if (state.patients.length === 0) {
+                html += `<p style="color:#94a3b8;">لا يوجد مرضى</p>`;
+            } else {
+                state.patients.forEach(p => {
+                    html += `
+                        <div class="card">
+                            <div class="title">${p.name} <span style="font-weight:400;font-size:14px;color:#64748b;">(${p.age} سنة)</span></div>
+                            <div style="font-size:13px;color:#475569;">${p.diagnosis} · سرير ${p.bed}</div>
+                            <div style="font-size:12px;color:#94a3b8;">${p.vitals || 'لا توجد فحوصات'}</div>
+                            <div style="margin-top:4px;">
+                                <button class="secondary" style="font-size:11px;padding:2px 10px;" onclick="updateVitals('${p.id}')">📊 فحوصات</button>
+                                <button class="secondary" style="font-size:11px;padding:2px 10px;" onclick="addNote('${p.id}')">📝 ملاحظة</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        //  7. دوال التفاعل (Actions)
+        // ============================================================
+
+        // إضافة مريض تجريبي
+        window.addDemoPatient = function() {
+            const newPatient = {
+                id: 'p' + uid(),
+                name: 'مريض ' + (state.patients.length + 1),
+                age: Math.floor(Math.random() * 10) + 1,
+                weight: Math.floor(Math.random() * 20) + 5,
+                bed: 'WARD-' + (Math.floor(Math.random() * 10) + 1),
+                diagnosis: 'تشخيص تجريبي',
+                status: 'نشط',
+                vitals: 'T:36.8 HR:120',
+                fluids: '',
+                meds: '',
+                notes: 'تمت الإضافة تجريبياً',
+                admissionDate: today(),
+                dischargeDate: null,
+                updatedAt: Date.now()
+            };
+            state.patients.push(newPatient);
+            saveAndSync('patients', state.patients);
+            showToast(`✅ تم إضافة ${newPatient.name}`);
+        };
+
+        // تحديث الفحوصات
+        window.updateVitals = function(id) {
+            const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
+            if (val === null) return;
+            const p = state.patients.find(p => p.id === id);
+            if (p) {
+                p.vitals = val;
+                p.updatedAt = Date.now();
+                saveAndSync('patients', state.patients);
+            }
+        };
+
+        // إضافة ملاحظة
+        window.addNote = function(id) {
+            const note = prompt('أضف ملاحظة:');
+            if (!note) return;
+            const p = state.patients.find(p => p.id === id);
+            if (p) {
+                p.notes = (p.notes || '') + '\n' + today() + ' ' + new Date().toLocaleTimeString() + ': ' + note;
+                p.updatedAt = Date.now();
+                saveAndSync('patients', state.patients);
+            }
+        };
+
+        // المزامنة اليدوية
+        window.syncNow = function() {
+            showToast('🔄 جاري المزامنة...');
+            syncInBackground();
+        };
+
+        // تصدير البيانات (يدوي)
+        window.exportData = function() {
+            const data = JSON.stringify(state, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `PaedsWard_Backup_${today()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('📤 تم تصدير البيانات');
+        };
+
+        // استيراد البيانات (يدوي)
+        window.importData = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.patients) state.patients = data.patients;
+                    if (data.tasks) state.tasks = data.tasks;
+                    if (data.handovers) state.handovers = data.handovers;
+                    if (data.clinicSlots) state.clinicSlots = data.clinicSlots;
+                    if (data.teamMessages) state.teamMessages = data.teamMessages;
+                    // إضافة updatedAt للجميع
+                    state.patients = state.patients.map(p => ({ ...p, updatedAt: Date.now() }));
+                    state.tasks = state.tasks.map(t => ({ ...t, updatedAt: Date.now() }));
+                    state.handovers = state.handovers.map(h => ({ ...h, updatedAt: Date.now() }));
+                    state.clinicSlots = state.clinicSlots.map(c => ({ ...c, updatedAt: Date.now() }));
+                    state.teamMessages = state.teamMessages.map(m => ({ ...m, updatedAt: Date.now() }));
+                    
+                    await store.setItem('state', state);
+                    render();
+                    showToast('✅ تم استيراد البيانات بنجاح');
+                    // محاولة رفعها للخادم
+                    syncInBackground();
+                } catch (err) {
+                    alert('⚠️ ملف غير صالح');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        };
+
+        // ============================================================
+        //  8. إبقاء الخادم مستيقظاً (Ping داخلي)
+        // ============================================================
+        setInterval(async () => {
+            try {
+                await fetch('/api/ping');
+                console.log('🏓 Ping sent to server');
+            } catch (e) { /* تجاهل */ }
+        }, 60000); // كل دقيقة
+
+        // ============================================================
+        //  9. بدء التشغيل
+        // ============================================================
+        loadLocalState();
+
+        console.log('✅ PaedsWard جاهز!');
+        console.log('📊 عدد المرضى:', state.patients.length);
+    </script>
+</body>
+  </html>
