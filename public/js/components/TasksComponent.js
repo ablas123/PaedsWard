@@ -1,224 +1,153 @@
-import EventBus from '../core/EventBus.js';
-import StateManager from '../core/StateManager.js';
+// ================================================================
+//  مكون المهام (Tasks)
+// ================================================================
+class TasksComponent {
+  constructor() {
+    this.container = document.getElementById('appContent');
+    this.tab = 'tasks';
+    bus.on('switchTab', (tab) => {
+      if (tab === this.tab) this.render();
+    });
+    bus.on('render', () => {
+      if (this.tab === 'tasks') this.render();
+    });
+    bus.on('stateChanged', () => this.render());
+  }
 
-/**
- * ==========================================================================
- * ✅ مكون إدارة المهام الطبية والتمريضية (Medical Tasks Component)
- * الميزات: ربط المهام بالأدوار الطبية، فلترة ذكية، تحقق من صلاحية الإكمال
- * ==========================================================================
- */
-export class TasksComponent {
-    constructor() {
-        this.container = document.getElementById('tasks-view');
-        this.currentSearchQuery = '';
-        
-        this.init();
-    }
+  render() {
+    const state = stateManager.get();
+    const search = state.searchQuery || '';
+    const pending = state.tasks.filter(t => !t.done && (t.text.includes(search) || t.assignee.includes(search)));
+    const done = state.tasks.filter(t => t.done && (t.text.includes(search) || t.assignee.includes(search)));
 
-    init() {
-        this.renderLayout();
-        this.setupListeners();
-        this.updateDisplay();
-    }
+    let html = `
+      <div class="flex-between mb-8">
+        <h2 style="font-size:18px;">📋 المهام</h2>
+        ${this.hasPermission('create_task') ? `<button class="small" onclick="tasks.showAddForm()">➕ إضافة</button>` : ''}
+      </div>
+    `;
 
-    /**
-     * بناء الهيكل الداخلي لتبويب المهام ونموذج الإضافة السريع
-     */
-    renderLayout() {
-        this.container.innerHTML = `
-            <div class="view-header">
-                <h2>إدارة المهام الطبية والتمريضية بالجناح</h2>
+    if (!pending.length) {
+      html += `<div class="empty-state"><div class="emoji">✅</div><p>${search ? 'لا توجد نتائج بحث' : 'لا توجد مهام معلقة'}</p></div>`;
+    } else {
+      pending.forEach(t => {
+        const isMine = t.assignee === state.currentRole || state.currentRole === 'senior';
+        const isOverdue = t.dueDate && t.dueDate < today() && !t.done;
+        const isSoon = t.dueDate && t.dueDate === today() && !t.done;
+        const tagClass = isOverdue ? 'overdue' : isSoon ? 'soon' : t.priority;
+        const dueDisplay = t.dueDate ? (t.dueTime ? `${t.dueDate} ${t.dueTime}` : t.dueDate) : '';
+        html += `
+          <div class="card" style="border-right-color:${isOverdue ? 'var(--danger)' : isSoon ? 'var(--warning)' : t.priority === 'high' ? 'var(--danger)' : t.priority === 'medium' ? 'var(--warning)' : 'var(--gray)'};">
+            <div class="flex-between">
+              <span class="title" style="font-size:14px;">${t.text} ${isOverdue ? '⏰' : isSoon ? '🕐' : ''}</span>
+              <span class="tag ${tagClass}">${isOverdue ? 'متأخرة' : isSoon ? 'مستحقة قريباً' : t.priority}</span>
             </div>
-
-            <div style="background: var(--bg-card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px;">
-                <h4 style="margin-bottom:12px; color: var(--primary-color);">➕ إسناد مهمة سريرية جديدة</h4>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: end;">
-                    <div>
-                        <label style="font-size:0.85rem; color:var(--text-muted);">نص المهمة (مثال: سحب عينة دم، إعطاء دواء):</label>
-                        <input type="text" id="task_title_input" class="role-selector" style="width:100%; text-align:right;" placeholder="اكتب تفاصيل المهمة هنا...">
-                    </div>
-                    <div>
-                        <label style="font-size:0.85rem; color:var(--text-muted);">الفئة المستهدفة (Assignee Role):</label>
-                        <select id="task_role_input" class="role-selector" style="width:100%;">
-                            <option value="nurse">💡 طاقم التمريض (Nurse)</option>
-                            <option value="junior">🩺 الطبيب المقيم (Junior)</option>
-                            <option value="senior">👑 الأخصائي / الاستشاري</option>
-                        </select>
-                    </div>
-                    <button id="submit_task_btn" class="action-btn-primary" style="height: 38px;">إضافة وإسناد</button>
-                </div>
-            </div>
-
-            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
-                <h4 style="margin-bottom:14px; color: var(--text-main);">📋 قائمة المهام النشطة والمعلقة</h4>
-                <div id="tasks_list_pool" style="display: flex; flex-direction: column; gap: 10px;">
-                    </div>
-            </div>
+            <div class="sub">👤 ${getRoleLabel(t.assignee)} · ${t.createdAt || ''} ${dueDisplay ? '· استحقاق: ' + dueDisplay : ''}</div>
+            ${isMine ? `<div class="actions"><button class="small" onclick="tasks.toggle('${t.id}')">✅ إنجاز</button></div>` : ''}
+          </div>
         `;
-
-        // ربط حدث زر الإضافة
-        document.getElementById('submit_task_btn').addEventListener('click', () => this.handleAddTask());
+      });
     }
 
-    setupListeners() {
-        // إعادة البناء عند تحديث البيانات الكلية أو تغيير الأدوار
-        EventBus.on('stateRefreshed', () => this.updateDisplay());
-        EventBus.on('collectionUpdated', () => this.updateDisplay());
-        EventBus.on('roleChanged', () => this.updateDisplay());
-
-        // الاستماع للبحث العالمي
-        EventBus.on('globalSearchTriggered', (query) => {
-            this.currentSearchQuery = query;
-            this.updateDisplay();
-        });
+    if (done.length) {
+      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ منجزة (${done.length})</summary>`;
+      done.forEach(t => {
+        html += `<div class="card" style="border-right-color:var(--success);opacity:0.5;">
+          <div class="flex-between"><span style="font-size:13px;">${t.text}</span><span class="done-badge">✓</span></div>
+        </div>`;
+      });
+      html += `</details>`;
     }
 
-    /**
-     * معالجة وقراءة البيانات لإنشاء مهمة جديدة
-     */
-    async handleAddTask() {
-        const titleInput = document.getElementById('task_title_input');
-        const roleSelect = document.getElementById('task_role_input');
-        
-        const title = titleInput.value.trim();
-        const assignedRole = roleSelect.value;
+    this.container.innerHTML = html;
+  }
 
-        if (!title) {
-            alert("يرجى كتابة نص المهمة أولاً.");
-            return;
-        }
+  hasPermission(perm) {
+    const state = stateManager.get();
+    const role = state.currentRole;
+    const ROLES = {
+      senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients'],
+      junior: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals'],
+      nurse: ['update_vitals', 'view_patients', 'complete_tasks'],
+      admin: ['manage_clinic', 'view_patients', 'send_alerts']
+    };
+    return ROLES[role] && ROLES[role].includes(perm);
+  }
 
-        const taskData = {
-            title,
-            assignedRole,
-            completed: false,
-            creator: StateManager.currentUserName
-        };
+  showAddForm() {
+    openModal(`
+      <h2>➕ إضافة مهمة جديدة</h2>
+      <label>وصف المهمة *</label><input id="taskText" placeholder="مثال: مراجعة نتائج المختبر">
+      <label>المسؤول</label>
+      <select id="taskAssignee" class="form-input">
+        <option value="senior">استشاري</option>
+        <option value="junior">طبيب مبتدئ</option>
+        <option value="nurse">ممرض</option>
+      </select>
+      <label>الأولوية</label>
+      <select id="taskPriority" class="form-input">
+        <option value="high">عالية</option>
+        <option value="medium" selected>متوسطة</option>
+        <option value="low">منخفضة</option>
+      </select>
+      <label>تاريخ الاستحقاق</label>
+      <input id="taskDueDate" type="date" value="${today()}">
+      <label>وقت الاستحقاق</label>
+      <input id="taskDueTime" type="time" value="${timeNow()}">
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="tasks.saveTask()">حفظ</button>
+        <button class="secondary" onclick="closeModal()">إلغاء</button>
+      </div>
+    `);
+  }
 
-        // الرفع لمدير الحالة المركزي
-        await StateManager.addGenericItem('tasks', taskData);
-        
-        // تصفير الحقل بعد النجاح
-        titleInput.value = '';
+  saveTask() {
+    const text = document.getElementById('taskText').value.trim();
+    const assignee = document.getElementById('taskAssignee').value;
+    const priority = document.getElementById('taskPriority').value;
+    const dueDate = document.getElementById('taskDueDate').value || today();
+    const dueTime = document.getElementById('taskDueTime').value || timeNow();
+
+    if (!text) {
+      showToast('⚠️ وصف المهمة مطلوب', 'error');
+      return;
     }
 
-    /**
-     * تحديث قائمة المهام المعروضة بناءً على الصلاحيات وحالة البحث
-     */
-    updateDisplay() {
-        const pool = document.getElementById('tasks_list_pool');
-        if (!pool) return;
+    const state = stateManager.get();
+    const newTask = {
+      id: 'temp_' + uid(),
+      text,
+      priority,
+      assignee,
+      done: false,
+      createdAt: today(),
+      dueDate,
+      dueTime,
+      reminded: false,
+      updatedAt: Date.now()
+    };
 
-        const tasks = StateManager.state.tasks || [];
-        pool.innerHTML = '';
+    state.tasks.push(newTask);
+    stateManager.save();
+    stateManager.addToQueue('tasks', 'POST', newTask, newTask.id);
 
-        if (tasks.length === 0) {
-            pool.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">لا توجد مهام مسجلة حالياً في هذا الجناح.</p>`;
-            return;
-        }
+    closeModal();
+    bus.emit('render');
+    showToast('📋 تمت إضافة المهمة', 'success');
+  }
 
-        tasks.forEach(task => {
-            // التحقق من مطابقة كلمة البحث العالمي
-            const matchesSearch = !this.currentSearchQuery || task.title.toLowerCase().includes(this.currentSearchQuery);
-            if (!matchesSearch) return;
-
-            const card = document.createElement('div');
-            card.style.cssText = `
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 16px;
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                background-color: ${task.completed ? '#f9fafb' : '#ffffff'};
-                border-right: 4px solid ${task.completed ? 'var(--success-color)' : 'var(--warning-color)'};
-                opacity: ${task.completed ? '0.7' : '1'};
-            `;
-
-            card.innerHTML = `
-                <div style="text-align: right;">
-                    <span style="text-decoration: ${task.completed ? 'line-through' : 'none'}; font-weight: 600; color: ${task.completed ? 'var(--text-muted)' : 'var(--text-main)'};">
-                        ${task.title}
-                    </span>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
-                        🎯 موجهة إلى: <span style="color:var(--primary-color); font-weight:700;">${this.translateRole(task.assignedRole)}</span> | بواسطة: ${task.creator || 'النظام'}
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    ${!task.completed ? `<button class="complete-task-btn" style="background:var(--success-color); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:0.8rem; cursor:pointer; font-weight:600;">✔️ إكمال</button>` : '<span style="color:var(--success-color); font-size:0.85rem; font-weight:700;">✅ اكتملت</span>'}
-                    <button class="delete-task-btn" style="background:none; border:none; color:var(--danger-color); cursor:pointer; font-size:0.9rem;" title="حذف المهمة">🗑️</button>
-                </div>
-            `;
-
-            // حدث زر إكمال المهمة مع التحقق من صلاحية الدور الحالية للسلامة الطبية
-            const completeBtn = card.querySelector('.complete-task-btn');
-            if (completeBtn) {
-                completeBtn.addEventListener('click', async () => {
-                    const currentUserRole = StateManager.currentUserRole;
-                    // يسمح للأدوار العليا أو الشخص الموجهة له المهمة بإكمالها
-                    if (currentUserRole === 'senior' || currentUserRole === 'admin' || currentUserRole === task.assignedRole) {
-                        // تحديث جزئي للمهمة على السيرفر ومحلياً
-                        task.completed = true;
-                        await this.updateTaskOnServer(task.id, { completed: true });
-                    } else {
-                        alert(`خطأ في الصلاحية: هذه المهمة مخصصة لدور [${this.translateRole(task.assignedRole)}]، ولا يمكن لكم إكمالها من الحساب الحالي.`);
-                    }
-                });
-            }
-
-            // حدث حذف المهمة
-            card.querySelector('.delete-task-btn').addEventListener('click', async () => {
-                if (confirm("هل تريد حذف هذه المهمة نهائياً من سجلات الجناح؟")) {
-                    try {
-                        const res = await fetch(`/api/tasks/${task.id}`, {
-                            method: 'DELETE',
-                            headers: StateManager.getAuthHeaders()
-                        });
-                        if (res.ok) {
-                            StateManager.state.tasks = StateManager.state.tasks.filter(t => t.id !== task.id);
-                            await StateManager.saveLocalState();
-                            this.updateDisplay();
-                            EventBus.emit('stateRefreshed', StateManager.state);
-                        }
-                    } catch (e) {
-                        alert("فشل حذف المهمة، يرجى التحقق من الصلاحيات والاتصال بالسيرفر.");
-                    }
-                }
-            });
-
-            pool.appendChild(card);
-        });
-    }
-
-    /**
-     * تحديث حالة المهمة على السيرفر مباشرة
-     */
-    async updateTaskOnServer(taskId, updatedFields) {
-        if (!StateManager.isOnline) {
-            await StateManager.saveLocalState();
-            this.updateDisplay();
-            return;
-        }
-
-        try {
-            await fetch(`/api/tasks/${taskId}`, {
-                method: 'PATCH',
-                headers: StateManager.getAuthHeaders(),
-                body: JSON.stringify(updatedFields)
-            });
-            await StateManager.fetchServerState(); // إعادة التزامن الكامل لإشعار باقي الأجهزة
-        } catch (e) {
-            console.error("فشلت مزامنة تحديث المهمة مع السيرفر.");
-        }
-    }
-
-    translateRole(role) {
-        const roles = { nurse: 'طاقم التمريض', junior: 'الطبيب المقيم', senior: 'الاستشاري / الأخصائي' };
-        return roles[role] || role;
-    }
+  toggle(id) {
+    const state = stateManager.get();
+    const t = state.tasks.find(task => task.id === id);
+    if (!t) return;
+    t.done = !t.done;
+    t.updatedAt = Date.now();
+    stateManager.save();
+    stateManager.addToQueue('tasks', 'PATCH', { done: t.done, updatedAt: t.updatedAt }, t.id);
+    bus.emit('render');
+    showToast(t.done ? '✅ تم إنجاز المهمة' : '🔄 أعيد فتح المهمة', t.done ? 'success' : 'warning');
+  }
 }
 
-// تشغيل وتفعيل المكون تلقائياً
-document.addEventListener('DOMContentLoaded', () => {
-    window.TasksModule = new TasksComponent();
-});
+const tasks = new TasksComponent();
+window.tasks = tasks;
