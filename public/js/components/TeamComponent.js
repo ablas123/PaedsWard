@@ -1,25 +1,33 @@
 // ================================================================
 //  مكون الفريق (Team)
 // ================================================================
+import { getRoleLabel, getRoleEmoji } from '../core/constants.js';
+
 class TeamComponent {
   constructor() {
     this.container = document.getElementById('appContent');
     this.tab = 'team';
-    bus.on('switchTab', (tab) => {
-      if (tab === this.tab) this.render();
-    });
-    bus.on('render', () => {
-      if (this.tab === 'team') this.render();
-    });
+    this.searchQuery = '';
+
+    bus.on('switchTab', (tab) => { if (tab === this.tab) this.render(); });
+    bus.on('render', () => { if (this.tab === 'team') this.render(); });
     bus.on('stateChanged', () => this.render());
+    bus.on('search', (query) => {
+      this.searchQuery = query;
+      this.render();
+    });
   }
 
   render() {
     const state = stateManager.get();
-    const search = state.searchQuery || '';
-    const messages = state.teamMessages.filter(m =>
-      m.sender.includes(search) || m.text.includes(search)
-    );
+    let messages = state.teamMessages;
+
+    if (this.searchQuery) {
+      messages = messages.filter(m =>
+        m.sender.includes(this.searchQuery) ||
+        m.text.includes(this.searchQuery)
+      );
+    }
 
     let html = `
       <div class="flex-between mb-8">
@@ -41,7 +49,7 @@ class TeamComponent {
     `;
 
     if (!messages.length) {
-      html += `<div class="empty-state"><div class="emoji">💬</div><p>${search ? 'لا توجد نتائج بحث' : 'لا توجد رسائل'}</p></div>`;
+      html += `<div class="empty-state"><div class="emoji">💬</div><p>${this.searchQuery ? 'لا توجد نتائج بحث' : 'لا توجد رسائل'}</p></div>`;
     } else {
       messages.slice().reverse().forEach(m => {
         html += `
@@ -74,7 +82,6 @@ class TeamComponent {
 
     const state = stateManager.get();
     const sender = state.teamMembers.find(m => m.role === state.currentRole)?.name || getRoleLabel(state.currentRole);
-
     const newMsg = {
       id: 'temp_' + uid(),
       sender: sender,
