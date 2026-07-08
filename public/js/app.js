@@ -331,4 +331,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 13. التصيير الأولي
   bus.emit('render');
-});
+}); 
