@@ -107,4 +107,44 @@ app.post('/api/sync/:collection', async (req, res) => {
 
 // نقطة إيقاظ (Ping)
 app.get('/api/ping', (req, res) => {
-  res.json({ status: 'awake', time: new Date
+  res.json({ status: 'awake', time: new Date().toISOString() });
+});
+
+// ============================================================
+//  3. النسخ الاحتياطي التلقائي (كل 6 ساعات)
+// ============================================================
+if (!fs.existsSync('./backups')) fs.mkdirSync('./backups');
+
+cron.schedule('0 */6 * * *', async () => {
+  console.log('🔄 بدء النسخ الاحتياطي...');
+  try {
+    const patients = await all('SELECT * FROM patients');
+    const tasks = await all('SELECT * FROM tasks');
+    const handovers = await all('SELECT * FROM handovers');
+    const clinicSlots = await all('SELECT * FROM clinicSlots');
+    const teamMessages = await all('SELECT * FROM teamMessages');
+    const state = { patients, tasks, handovers, clinicSlots, teamMessages, exportedAt: new Date().toISOString() };
+    const filename = `backup_${Date.now()}.json`;
+    const filePath = path.join('./backups', filename);
+    fs.writeFileSync(filePath, JSON.stringify(state, null, 2));
+    // احتفظ بآخر 10 نسخ
+    const files = fs.readdirSync('./backups').sort();
+    if (files.length > 10) {
+      const toDelete = files.slice(0, files.length - 10);
+      for (const f of toDelete) fs.unlinkSync(path.join('./backups', f));
+    }
+    console.log('✅ تم حفظ النسخة:', filename);
+  } catch (e) {
+    console.error('❌ فشل النسخ الاحتياطي:', e);
+  }
+});
+
+// ============================================================
+//  4. تشغيل الخادم
+// ============================================================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📂 Database: ${path.resolve('paedsward.db')}`);
+  console.log(`📂 Backups: ${path.resolve('./backups')}`);
+});
