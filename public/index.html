@@ -3,714 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>🏥 PaedsWard – المتكامل النهائي</title>
+  <title>🏥 PaedsWard – سير العمل المتكامل</title>
   <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22PaedsWard%22%2C%22short_name%22%3A%22PaedsWard%22%2C%22start_url%22%3A%22.%2Findex.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f0f4f8%22%2C%22theme_color%22%3A%22%231a73e8%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231a73e8'%2F%3E%3Ctext%20x%3D'50'%20y%3D'65'%20font-size%3D'40'%20text-anchor%3D'middle'%20fill%3D'white'%3E%2B%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
   <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
   <style>
-    /* ===== نظام التصميم المتقدم ===== */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --primary: #1a73e8; --primary-dark: #0b3d91; --primary-light: #e8f0fe;
       --secondary: #6c63ff; --success: #22c55e; --danger: #e53935;
-      --warning: #f59e0b; --info: #06b6d4; --gray: #94a3b8; --dark: #1e293b;
-      --font-family: 'Cairo', 'Segoe UI', system-ui, sans-serif;
-      --font-size-base: 14px; --font-size-large: 18px; --font-size-small: 12px;
-      --spacing-xs: 4px; --spacing-sm: 8px; --spacing-md: 16px; --spacing-lg: 24px; --spacing-xl: 32px;
-      --radius: 16px; --shadow: 0 4px 20px rgba(0,0,0,0.08); --transition: 0.3s ease;
+      --warning: #f59e0b; --gray: #94a3b8; --dark: #1e293b;
+      --font: 'Cairo', system-ui, sans-serif;
+      --radius: 12px; --shadow: 0 4px 12px rgba(0,0,0,0.08);
+      --transition: 0.25s ease;
     }
-    body {
-      font-family: var(--font-family);
-      background: #f1f5f9;
-      touch-action: manipulation;
-      color: var(--dark);
-      direction: rtl;
-      font-size: var(--font-size-base);
-      line-height: 1.6;
-    }
-    .app {
-      max-width: 500px;
-      margin: 0 auto;
-      background: #ffffff;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 40px rgba(0,0,0,0.06);
-      position: relative;
-    }
-    @media (min-width: 501px) {
-      .app { max-width: 600px; min-height: 90vh; height: 95vh; border-radius: 24px; margin: 20px auto; }
-      body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #dce3ed; }
-    }
-    @media (min-width: 768px) {
-      .app { max-width: 900px; }
-      .app .drawer-toggle { display: flex !important; }
-      .app .tab-bar { display: none !important; }
-      .app .drawer { transform: translateX(0) !important; width: 220px; }
-      .app .main-content { margin-right: 220px; }
-    }
-
-    /* ─── Offline Mode ─── */
-    .offline-banner {
-      background: var(--danger);
-      color: white;
-      padding: 4px 12px;
-      text-align: center;
-      font-size: var(--font-size-small);
-      font-weight: 600;
-      display: none;
-    }
+    body { font-family: var(--font); background: #f1f5f9; direction: rtl; font-size: 14px; line-height: 1.6; }
+    .app { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.05); }
+    @media (min-width: 501px) { .app { max-width: 600px; min-height: 90vh; height: 95vh; border-radius: 20px; margin: 20px auto; } body { display: flex; align-items: center; justify-content: center; background: #dce3ed; } }
+    @media (min-width: 768px) { .app { max-width: 900px; } .app .drawer { transform: translateX(0) !important; width: 220px; } .app .main-content { margin-right: 220px; } .app .tab-bar { display: none !important; } }
+    /* Offline Banner */
+    .offline-banner { background: var(--danger); color: white; padding: 4px 12px; text-align: center; font-size: 12px; font-weight: 600; display: none; }
     .offline-banner.visible { display: block; }
-
-    /* ─── Header ─── */
-    header {
-      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-      color: white;
-      padding: var(--spacing-md) var(--spacing-lg);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-radius: 0 0 24px 24px;
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-      gap: var(--spacing-sm);
-    }
-    header .brand { font-size: var(--font-size-large); font-weight: 800; }
-    header .brand small { font-weight: 400; font-size: var(--font-size-small); opacity: 0.8; }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-      flex-wrap: wrap;
-    }
-    .header-actions select {
-      background: rgba(255,255,255,0.18);
-      color: white;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 30px;
-      padding: 4px 12px;
-      font-size: var(--font-size-small);
-      font-weight: 500;
-      cursor: pointer;
-      outline: none;
-      direction: rtl;
-      backdrop-filter: blur(4px);
-    }
+    /* Header */
+    header { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 20px 20px; position: sticky; top: 0; z-index: 30; flex-shrink: 0; flex-wrap: wrap; gap: 6px; }
+    header .brand { font-size: 18px; font-weight: 800; cursor: pointer; }
+    header .brand small { font-weight: 400; font-size: 10px; opacity: 0.8; }
+    .header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .header-actions select { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.25); border-radius: 30px; padding: 4px 12px; font-size: 12px; font-weight: 500; cursor: pointer; outline: none; direction: rtl; backdrop-filter: blur(4px); }
     .header-actions select option { background: var(--dark); color: white; }
-    .header-actions button {
-      background: rgba(255,255,255,0.15);
-      border: none;
-      color: white;
-      padding: 4px 12px;
-      border-radius: 30px;
-      font-size: var(--font-size-small);
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-    }
+    .header-actions button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 4px 12px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); }
     .header-actions button:active { transform: scale(0.95); }
     #adminBtn { background: #fbbf24; color: var(--dark); display: none; }
     #adminBtn.visible { display: inline-block; }
-    .drawer-toggle {
-      display: none;
-      background: rgba(255,255,255,0.15);
-      border: none;
-      color: white;
-      padding: 4px 12px;
-      border-radius: 30px;
-      font-size: 18px;
-      cursor: pointer;
-    }
-    .sync-status {
-      font-size: var(--font-size-small);
-      background: rgba(255,255,255,0.15);
-      padding: 2px 10px;
-      border-radius: 30px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
+    .drawer-toggle { display: none; background: rgba(255,255,255,0.15); border: none; color: white; padding: 4px 12px; border-radius: 30px; font-size: 18px; cursor: pointer; }
+    .sync-status { font-size: 12px; background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 30px; display: flex; align-items: center; gap: 4px; }
     .sync-status .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
     .sync-status .dot.online { background: #4ade80; }
     .sync-status .dot.offline { background: #f87171; }
-
-    /* ─── Drawer (قائمة جانبية) ─── */
-    .drawer {
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 280px;
-      height: 100%;
-      background: white;
-      z-index: 40;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-      padding: var(--spacing-md);
-      overflow-y: auto;
-    }
+    /* Drawer */
+    .drawer { position: fixed; top: 0; right: 0; width: 280px; height: 100%; background: white; z-index: 40; transform: translateX(100%); transition: transform 0.3s ease; box-shadow: -4px 0 20px rgba(0,0,0,0.1); padding: 16px; overflow-y: auto; }
     .drawer.open { transform: translateX(0); }
-    .drawer .drawer-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: var(--spacing-md);
-      border-bottom: 1px solid #e2e8f0;
-      margin-bottom: var(--spacing-md);
-    }
-    .drawer .drawer-header h3 { font-size: var(--font-size-base); }
-    .drawer .drawer-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: var(--gray);
-    }
-    .drawer .drawer-item {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-      padding: var(--spacing-sm) var(--spacing-md);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: var(--transition);
-      color: var(--dark);
-      text-decoration: none;
-      font-size: var(--font-size-base);
-    }
+    .drawer .drawer-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; margin-bottom: 12px; }
+    .drawer .drawer-header h3 { font-size: 16px; }
+    .drawer .drawer-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); }
+    .drawer .drawer-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: var(--transition); color: var(--dark); text-decoration: none; font-size: 14px; }
     .drawer .drawer-item:hover { background: var(--primary-light); }
     .drawer .drawer-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
-    .drawer .drawer-item .badge {
-      background: var(--danger);
-      color: white;
-      border-radius: 30px;
-      padding: 0px 6px;
-      font-size: 10px;
-      font-weight: 700;
-      margin-right: auto;
-    }
-
-    .drawer-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.3);
-      z-index: 35;
-      display: none;
-    }
+    .drawer .drawer-item .badge { background: var(--danger); color: white; border-radius: 30px; padding: 0px 6px; font-size: 10px; font-weight: 700; margin-right: auto; }
+    .drawer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 35; display: none; }
     .drawer-overlay.visible { display: block; }
-
-    /* ─── Search Bar ─── */
-    .search-bar {
-      padding: var(--spacing-sm) var(--spacing-md);
-      background: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .search-bar input {
-      width: 100%;
-      padding: var(--spacing-sm) var(--spacing-md);
-      border: 1.5px solid #e2e8f0;
-      border-radius: 30px;
-      font-size: var(--font-size-base);
-      background: #f8fafc;
-      outline: none;
-      transition: var(--transition);
-      font-family: var(--font-family);
-    }
-    .search-bar input:focus {
-      border-color: var(--primary);
-      background: white;
-      box-shadow: 0 0 0 3px rgba(26,115,232,0.15);
-    }
-
-    /* ─── Dashboard ─── */
-    .dashboard {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--spacing-sm);
-      margin-bottom: var(--spacing-md);
-    }
-    .dashboard .stat-card {
-      background: white;
-      border-radius: var(--radius);
-      padding: var(--spacing-md);
-      box-shadow: var(--shadow);
-      border-right: 4px solid var(--primary);
-      text-align: center;
-    }
-    .dashboard .stat-card .stat-number { font-size: 28px; font-weight: 800; }
-    .dashboard .stat-card .stat-label { font-size: var(--font-size-small); color: var(--gray); }
+    /* Search Bar */
+    .search-bar { padding: 8px 16px; background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10; }
+    .search-bar input { width: 100%; padding: 8px 14px; border: 1.5px solid #e2e8f0; border-radius: 30px; font-size: 14px; background: #f8fafc; outline: none; transition: var(--transition); font-family: var(--font); }
+    .search-bar input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
+    /* Dashboard */
+    .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .dashboard .stat-card { background: white; border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); border-right: 4px solid var(--primary); text-align: center; }
+    .dashboard .stat-card .stat-number { font-size: 24px; font-weight: 800; }
+    .dashboard .stat-card .stat-label { font-size: 12px; color: var(--gray); }
     .dashboard .stat-card.primary { border-right-color: var(--primary); }
     .dashboard .stat-card.success { border-right-color: var(--success); }
     .dashboard .stat-card.warning { border-right-color: var(--warning); }
     .dashboard .stat-card.danger { border-right-color: var(--danger); }
     .dashboard .stat-card.secondary { border-right-color: var(--secondary); }
-
-    /* ─── Tab Bar ─── */
-    .tab-bar {
-      display: flex;
-      background: white;
-      border-top: 1px solid #e2e8f0;
-      position: sticky;
-      bottom: 0;
-      z-index: 15;
-      flex-shrink: 0;
-    }
-    .tab {
-      flex: 1;
-      text-align: center;
-      padding: var(--spacing-sm) var(--spacing-xs) var(--spacing-xs);
-      font-size: var(--font-size-small);
-      color: var(--gray);
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      transition: var(--transition);
-      user-select: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      position: relative;
-    }
-    .tab .tab-icon { font-size: 20px; }
+    /* Tab Bar */
+    .tab-bar { display: flex; background: white; border-top: 1px solid #e2e8f0; position: sticky; bottom: 0; z-index: 15; flex-shrink: 0; }
+    .tab { flex: 1; text-align: center; padding: 6px 4px 4px; font-size: 10px; color: var(--gray); cursor: pointer; border-bottom: 3px solid transparent; transition: var(--transition); user-select: none; display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; }
+    .tab .tab-icon { font-size: 18px; }
     .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-light); }
-    .badge {
-      position: absolute;
-      top: 2px;
-      right: 8px;
-      background: var(--danger);
-      color: white;
-      border-radius: 30px;
-      padding: 0px 6px;
-      font-size: 9px;
-      font-weight: 700;
-      display: none;
-      min-width: 18px;
-      text-align: center;
-    }
-
-    /* ─── Content ─── */
-    .main-content {
-      flex: 1;
-      padding: var(--spacing-md);
-      overflow-y: auto;
-      background: #f8fafc;
-    }
-
-    /* ─── Cards ─── */
-    .card {
-      background: white;
-      border-radius: var(--radius);
-      padding: var(--spacing-md);
-      margin-bottom: var(--spacing-sm);
-      box-shadow: var(--shadow);
-      border-right: 4px solid var(--primary);
-      transition: var(--transition);
-      cursor: default;
-    }
+    .badge { position: absolute; top: 2px; right: 8px; background: var(--danger); color: white; border-radius: 30px; padding: 0px 6px; font-size: 9px; font-weight: 700; display: none; min-width: 18px; text-align: center; }
+    /* Main Content */
+    .main-content { flex: 1; padding: 12px; overflow-y: auto; background: #f8fafc; }
+    /* Cards */
+    .card { background: white; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); border-right: 4px solid var(--primary); transition: var(--transition); cursor: default; }
     .card.clickable { cursor: pointer; }
     .card.clickable:active { transform: scale(0.98); }
-    .card .title { font-weight: 700; font-size: var(--font-size-base); }
-    .card .sub { color: var(--gray); font-size: var(--font-size-small); }
-    .card .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--spacing-xs) var(--spacing-sm);
-      margin-top: var(--spacing-xs);
-      font-size: var(--font-size-small);
-    }
-    .card .actions {
-      margin-top: var(--spacing-sm);
-      display: flex;
-      gap: var(--spacing-xs);
-      flex-wrap: wrap;
-    }
-    .card .urgent-badge { background: var(--danger); color: white; padding: 1px 8px; border-radius: 30px; font-size: 10px; font-weight: 700; }
-    .card .done-badge { background: var(--success); color: white; padding: 1px 8px; border-radius: 30px; font-size: 10px; font-weight: 700; }
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 30px;
-      font-size: var(--font-size-small);
-      font-weight: 600;
-    }
-    .status-badge.admitted { background: #dbeafe; color: #1a56db; }
-    .status-badge.discharged { background: #d1fae5; color: #065f46; }
-    .status-badge.waiting { background: #fef3c7; color: #92400e; }
-    .status-badge.completed { background: #d1fae5; color: #065f46; }
-    .status-badge.critical { background: #fee2e2; color: #b91c1c; }
-    .status-badge.stable { background: #dbeafe; color: #1a56db; }
-    .status-badge.monitoring { background: #fef3c7; color: #92400e; }
-    .status-badge.intervention { background: #fce4ec; color: #c62828; }
-    .tag {
-      display: inline-block;
-      padding: 1px 8px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 600;
-      background: #e2e8f0;
-    }
+    .card .title { font-weight: 700; font-size: 15px; }
+    .card .sub { color: var(--gray); font-size: 12px; }
+    .card .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 12px; }
+    .card .actions { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 600; }
+    .status-badge.stage1 { background: #dbeafe; color: #1a56db; }
+    .status-badge.stage2 { background: #fef3c7; color: #92400e; }
+    .status-badge.stage3 { background: #d1fae5; color: #065f46; }
+    .status-badge.stage4 { background: #e0e7ff; color: #3730a3; }
+    .status-badge.discharged { background: #f1f5f9; color: #64748b; }
+    .tag { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; background: #e2e8f0; }
     .tag.high { background: #fee2e2; color: #b91c1c; }
     .tag.medium { background: #fef3c7; color: #92400e; }
     .tag.low { background: #dbeafe; color: #1a56db; }
     .tag.overdue { background: #fee2e2; color: #b91c1c; border: 1px solid #b91c1c; }
     .tag.soon { background: #fef3c7; color: #92400e; }
-
-    /* ─── Buttons ─── */
-    button {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 16px;
-      font-size: var(--font-size-base);
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      touch-action: manipulation;
-    }
+    /* Buttons */
+    button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: var(--transition); touch-action: manipulation; }
     button:active { transform: scale(0.96); }
     button.secondary { background: var(--primary-light); color: var(--primary); }
     button.danger { background: var(--danger); color: white; }
     button.success { background: var(--success); color: white; }
-    button.warning { background: var(--warning); color: white; }
-    button.small { padding: 4px 12px; font-size: var(--font-size-small); }
+    button.small { padding: 4px 12px; font-size: 12px; }
     button.block { width: 100%; justify-content: center; margin: 4px 0; }
-    button.gold { background: #fbbf24; color: var(--dark); }
-
-    /* ─── Forms ─── */
-    input, textarea, select.form-input {
-      width: 100%;
-      padding: 10px 14px;
-      margin: 4px 0 10px;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: var(--font-size-base);
-      background: #f8fafc;
-      outline: none;
-      font-family: var(--font-family);
-      direction: rtl;
-      transition: var(--transition);
-    }
-    input:focus, textarea:focus, select.form-input:focus {
-      border-color: var(--primary);
-      background: white;
-      box-shadow: 0 0 0 3px rgba(26,115,232,0.1);
-    }
-    textarea { min-height: 80px; resize: vertical; }
-    label { font-size: var(--font-size-small); font-weight: 600; color: #475569; display: block; margin-top: 6px; }
-    .check-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 400;
-      font-size: var(--font-size-base);
-      cursor: pointer;
-      margin: 4px 0;
-    }
+    /* Forms */
+    input, textarea, select { width: 100%; padding: 10px 14px; margin: 4px 0 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: #f8fafc; outline: none; font-family: var(--font); direction: rtl; transition: var(--transition); }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+    textarea { min-height: 70px; resize: vertical; }
+    label { font-size: 12px; font-weight: 600; color: #475569; display: block; margin-top: 4px; }
+    .check-label { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 14px; cursor: pointer; margin: 4px 0; }
     .check-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .form-row .full { grid-column: 1 / -1; }
-
-    /* ─── Wizard (خطوات النموذج) ─── */
-    .wizard-step { display: none; }
-    .wizard-step.active { display: block; }
-    .wizard-progress {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: var(--spacing-md);
-      position: relative;
-    }
-    .wizard-progress::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: #e2e8f0;
-      transform: translateY(-50%);
-      z-index: 0;
-    }
-    .wizard-progress .step-indicator {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      z-index: 1;
-      background: white;
-      padding: 0 4px;
-    }
-    .wizard-progress .step-indicator .step-circle {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      border: 2px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: var(--font-size-small);
-      background: white;
-      color: var(--gray);
-      transition: var(--transition);
-    }
-    .wizard-progress .step-indicator .step-circle.active {
-      border-color: var(--primary);
-      background: var(--primary);
-      color: white;
-    }
-    .wizard-progress .step-indicator .step-circle.done {
-      border-color: var(--success);
-      background: var(--success);
-      color: white;
-    }
-    .wizard-progress .step-indicator .step-label {
-      font-size: 10px;
-      color: var(--gray);
-      margin-top: 4px;
-    }
-
-    /* ─── Modal ─── */
-    .modal {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(15,23,42,0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: var(--spacing-md);
-    }
-    .modal-content {
-      background: white;
-      border-radius: 24px;
-      padding: var(--spacing-lg);
-      width: 100%;
-      max-width: 500px;
-      max-height: 85vh;
-      overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-      animation: modalSlide 0.3s ease;
-    }
+    /* Modal */
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 12px; }
+    .modal-content { background: white; border-radius: 20px; padding: 16px 18px; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: modalSlide 0.3s ease; }
     @keyframes modalSlide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .modal-content h2 { font-size: 22px; margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: 8px; }
-    .modal-content h3 { font-size: var(--font-size-base); margin: var(--spacing-md) 0 var(--spacing-sm); color: #475569; }
+    .modal-content h2 { font-size: 20px; margin-bottom: 12px; }
+    .modal-content h3 { font-size: 15px; margin: 10px 0 4px; color: #475569; }
     .hidden { display: none !important; }
-
-    /* ─── Snapshot Tabs ─── */
-    .snapshot-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      border-bottom: 2px solid #e2e8f0;
-      margin-bottom: var(--spacing-md);
-      gap: 2px;
-    }
-    .snapshot-tab {
-      padding: 6px 14px;
-      cursor: pointer;
-      font-size: var(--font-size-small);
-      font-weight: 500;
-      color: var(--gray);
-      border-bottom: 3px solid transparent;
-      transition: var(--transition);
-      border-radius: 6px 6px 0 0;
-    }
-    .snapshot-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-light); }
-
-    /* ─── Empty State ─── */
-    .empty-state { text-align: center; padding: 40px 16px; color: var(--gray); }
-    .empty-state .emoji { font-size: 40px; }
-    .empty-state p { font-size: var(--font-size-base); }
-
-    /* ─── Utilities ─── */
-    .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--spacing-sm); }
-    .text-muted { color: var(--gray); font-size: var(--font-size-small); }
-    .text-sm { font-size: var(--font-size-small); }
-    .mt-8 { margin-top: var(--spacing-sm); }
-    .mb-8 { margin-bottom: var(--spacing-sm); }
-
-    /* ─── Toast ─── */
-    .toast {
-      position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--dark);
-      color: white;
-      padding: 10px 24px;
-      border-radius: 30px;
-      font-size: var(--font-size-base);
-      font-weight: 500;
-      z-index: 200;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
-      max-width: 90%;
-      text-align: center;
-      animation: slideUp 0.3s ease;
-    }
+    /* Workflow Progress */
+    .workflow-progress { display: flex; justify-content: space-between; margin: 10px 0; position: relative; }
+    .workflow-progress::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #e2e8f0; transform: translateY(-50%); z-index: 0; }
+    .workflow-step { display: flex; flex-direction: column; align-items: center; z-index: 1; background: white; padding: 0 4px; }
+    .workflow-step .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; background: white; color: var(--gray); transition: var(--transition); }
+    .workflow-step .step-circle.active { border-color: var(--primary); background: var(--primary); color: white; }
+    .workflow-step .step-circle.done { border-color: var(--success); background: var(--success); color: white; }
+    .workflow-step .step-label { font-size: 10px; color: var(--gray); margin-top: 4px; text-align: center; }
+    /* Toast */
+    .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--dark); color: white; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 500; z-index: 200; box-shadow: 0 8px 30px rgba(0,0,0,0.2); max-width: 90%; text-align: center; animation: slideUp 0.3s ease; }
     @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-
-    /* ─── Charts ─── */
-    .chart-wrap { background: #f8fafc; border-radius: 12px; padding: var(--spacing-sm); margin: var(--spacing-sm) 0; text-align: center; }
+    /* Charts */
+    .chart-wrap { background: #f8fafc; border-radius: 10px; padding: 8px; margin: 6px 0; text-align: center; }
     .chart-wrap canvas { max-width: 100%; height: auto; }
-
-    /* ─── Team ─── */
-    .member-list { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); margin: var(--spacing-sm) 0; }
-    .member-list .member { background: var(--primary-light); padding: 4px 14px; border-radius: 30px; font-size: var(--font-size-small); display: flex; align-items: center; gap: 4px; }
+    /* Team */
+    .member-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+    .member-list .member { background: var(--primary-light); padding: 4px 12px; border-radius: 30px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
     .role-tag { display: inline-block; padding: 1px 8px; border-radius: 30px; font-size: 10px; font-weight: 600; background: var(--primary-light); color: var(--primary); }
-
-    .message { background: white; padding: var(--spacing-sm) var(--spacing-md); border-radius: 12px; margin-bottom: 4px; border-right: 3px solid #8b5cf6; }
-    .message .sender { font-weight: 700; font-size: var(--font-size-small); }
+    .message { background: white; padding: 8px 12px; border-radius: 10px; margin-bottom: 4px; border-right: 3px solid #8b5cf6; }
+    .message .sender { font-weight: 700; font-size: 12px; }
     .message .time { color: var(--gray); font-size: 10px; }
-    .message .text { font-size: var(--font-size-base); margin-top: 2px; }
-
-    /* ─── Scrollbar ─── */
+    .message .text { font-size: 13px; margin-top: 2px; }
+    /* Lazy Loader */
+    .lazy-loader { text-align: center; padding: 16px; color: var(--gray); font-size: 12px; }
+    .lazy-loader .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Scrollbar */
     .main-content::-webkit-scrollbar { width: 4px; }
     .main-content::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
     .main-content::-webkit-scrollbar-track { background: transparent; }
-
-    /* ─── Lazy Loading ─── */
-    .lazy-loader {
-      text-align: center;
-      padding: var(--spacing-md);
-      color: var(--gray);
-      font-size: var(--font-size-small);
-    }
-    .lazy-loader .spinner {
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      border: 3px solid #e2e8f0;
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state { text-align: center; padding: 30px 16px; color: var(--gray); }
+    .empty-state .emoji { font-size: 32px; }
+    .empty-state p { font-size: 13px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .text-muted { color: var(--gray); font-size: 12px; }
+    .text-sm { font-size: 12px; }
+    .mt-8 { margin-top: 8px; }
+    .mb-8 { margin-bottom: 8px; }
   </style>
 </head>
 <body>
-<div class="app" id="app">
+<div id="app">
   <!-- Offline Banner -->
-  <div class="offline-banner" id="offlineBanner">⚠️ وضع غير متصل – سيتم المزامنة تلقائياً عند عودة الاتصال</div>
-
+  <div class="offline-banner" id="offlineBanner">⚠️ وضع غير متصل – سيتم المزامنة تلقائياً</div>
   <!-- Drawer Overlay -->
   <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
-
-  <!-- Drawer (قائمة جانبية) -->
+  <!-- Drawer -->
   <div class="drawer" id="drawer">
-    <div class="drawer-header">
-      <h3>🏥 PaedsWard</h3>
-      <button class="drawer-close" onclick="toggleDrawer()">✕</button>
-    </div>
-    <div class="drawer-item active" data-tab="ward" onclick="showTab('ward'); toggleDrawer();">
-      <span>🏥</span> الجناح
-    </div>
-    <div class="drawer-item" data-tab="clinic" onclick="showTab('clinic'); toggleDrawer();">
-      <span>🩺</span> العيادة
-    </div>
-    <div class="drawer-item" data-tab="tasks" onclick="showTab('tasks'); toggleDrawer();">
-      <span>📋</span> المهام
-      <span class="badge" id="drawerTaskBadge">0</span>
-    </div>
-    <div class="drawer-item" data-tab="team" onclick="showTab('team'); toggleDrawer();">
-      <span>👥</span> الفريق
-      <span class="badge" id="drawerTeamBadge">0</span>
-    </div>
-    <div class="drawer-item" data-tab="handover" onclick="showTab('handover'); toggleDrawer();">
-      <span>📝</span> التسليم
-      <span class="badge" id="drawerHandoverBadge">0</span>
-    </div>
-    <div class="drawer-item" data-tab="reports" onclick="showTab('reports'); toggleDrawer();">
-      <span>📊</span> التقارير
-    </div>
-    <hr style="margin:12px 0;border-color:#e2e8f0;">
-    <div class="drawer-item" onclick="openAdminPanel(); toggleDrawer();" id="drawerAdminBtn" style="display:none;">
-      <span>🔑</span> إدارة الفريق
-    </div>
-    <div class="drawer-item" onclick="exportData(); toggleDrawer();">
-      <span>📤</span> تصدير
-    </div>
-    <div class="drawer-item" onclick="document.getElementById('importFile').click(); toggleDrawer();">
-      <span>📥</span> استيراد
-    </div>
+    <div class="drawer-header"><h3>🏥 PaedsWard</h3><button class="drawer-close" onclick="toggleDrawer()">✕</button></div>
+    <div id="drawerItems"></div>
+    <hr>
+    <div class="drawer-item" onclick="adminOpenPanel(); toggleDrawer();" id="drawerAdminBtn" style="display:none;"><span>🔑</span> إدارة الفريق</div>
+    <div class="drawer-item" onclick="exportData(); toggleDrawer();"><span>📤</span> تصدير</div>
+    <div class="drawer-item" onclick="document.getElementById('importFile').click(); toggleDrawer();"><span>📥</span> استيراد</div>
   </div>
-
+  <!-- Header -->
   <header>
-    <div class="brand">🏥 PaedsWard <small>· PRO</small></div>
+    <div class="brand" onclick="switchTab('dashboard')">🏥 PaedsWard <small>· سير العمل</small></div>
     <div class="header-actions">
-      <button class="drawer-toggle" id="drawerToggleBtn" onclick="toggleDrawer()">☰</button>
+      <button class="drawer-toggle" onclick="toggleDrawer()">☰</button>
       <select id="roleSelect" onchange="switchRole(this.value)">
         <option value="senior">👨‍⚕️ استشاري</option>
         <option value="junior">🧑‍⚕️ مبتدئ</option>
         <option value="nurse">👩‍⚕️ ممرض</option>
         <option value="admin">📋 إداري</option>
       </select>
-      <button id="adminBtn" onclick="openAdminPanel()">🔑</button>
+      <button id="adminBtn" onclick="adminOpenPanel()">🔑</button>
       <button onclick="exportData()" title="تصدير">📤</button>
       <button onclick="document.getElementById('importFile').click()" title="استيراد">📥</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-      <span class="sync-status" id="syncStatus">
-        <span class="dot offline" id="syncDot"></span>
-        <span id="syncLabel">محلي</span>
-      </span>
+      <span class="sync-status"><span class="dot offline" id="syncDot"></span><span id="syncLabel">محلي</span></span>
     </div>
   </header>
-
   <!-- Search Bar -->
   <div class="search-bar">
-    <input type="text" id="globalSearch" placeholder="🔍 بحث عن مريض، مهمة، موعد، رسالة، تسليم..." oninput="searchGlobal(this.value)">
+    <input type="text" id="globalSearch" placeholder="🔍 بحث في جميع البيانات..." oninput="searchGlobal(this.value)">
   </div>
-
   <!-- Main Content -->
-  <div class="main-content" id="content"></div>
-
-  <!-- Tab Bar (للشاشات الصغيرة) -->
-  <div class="tab-bar">
-    <div class="tab active" data-tab="ward" onclick="showTab('ward')">
-      <span class="tab-icon">🏥</span><span>الجناح</span>
-    </div>
-    <div class="tab" data-tab="clinic" onclick="showTab('clinic')">
-      <span class="tab-icon">🩺</span><span>العيادة</span>
-    </div>
-    <div class="tab" data-tab="tasks" onclick="showTab('tasks')">
-      <span class="tab-icon">📋</span><span>المهام</span>
-      <span class="badge" id="taskBadge">0</span>
-    </div>
-    <div class="tab" data-tab="team" onclick="showTab('team')">
-      <span class="tab-icon">👥</span><span>الفريق</span>
-      <span class="badge" id="teamBadge">0</span>
-    </div>
-    <div class="tab" data-tab="handover" onclick="showTab('handover')">
-      <span class="tab-icon">📝</span><span>التسليم</span>
-      <span class="badge" id="handoverBadge">0</span>
-    </div>
-    <div class="tab" data-tab="reports" onclick="showTab('reports')">
-      <span class="tab-icon">📊</span><span>التقارير</span>
-    </div>
-  </div>
+  <div class="main-content" id="appContent"></div>
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar"></div>
 </div>
-
 <!-- Modal -->
 <div id="modal" class="modal hidden" onclick="closeModalOverlay(event)">
   <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
 </div>
+
 <script>
 // ================================================================
-//  التطبيق المتكامل – الإصدار PRO (مع كل التحسينات)
+//  نظام سير العمل المتكامل – Workflow-Driven Architecture
 // ================================================================
 
+// ─── 1. إدارة الحالة (State) ───
 const store = localforage.createInstance({ name: 'PaedsWard', storeName: 'state' });
-
 let state = {
-  patients: [], tasks: [], handovers: [], clinicSlots: [],
+  patients: [],
+  tasks: [],
+  handovers: [],
+  clinicSlots: [],
   teamMembers: [
     { id: 'u1', name: 'د. أحمد', role: 'senior' },
     { id: 'u2', name: 'د. سارة', role: 'junior' },
@@ -722,263 +227,154 @@ let state = {
   auditLog: [],
   searchQuery: '',
   isOffline: false,
-  pendingChanges: []
+  _version: '6.0.0'
 };
 
-let currentTab = 'ward';
-let selectedPatient = null;
-let snapshotTab = 'overview';
-let isSyncing = false;
-let retryTimer = null;
-let syncDebounce = null;
-let notificationPermission = false;
-
-// Lazy Loading
-let displayedCount = 10;
-const PAGE_SIZE = 10;
-
-// ─── تحميل البيانات ───
-async function loadState() {
-  try {
-    const saved = await store.getItem('state');
-    if (saved) {
-      state = { ...state, ...saved };
-      return true;
-    }
-  } catch (e) { console.warn('⚠️ فشل التحميل:', e); }
-  return false;
-}
-
-async function saveState() {
-  try {
-    await store.setItem('state', state);
-    syncDelayed();
-  } catch (e) { console.warn('⚠️ فشل الحفظ:', e); }
-}
-
-function addAuditLog(action, details) {
-  state.auditLog.push({
-    timestamp: new Date().toISOString(),
-    user: state.currentRole,
-    action, details,
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4)
-  });
-  if (state.auditLog.length > 100) state.auditLog = state.auditLog.slice(-100);
-}
-
-// ─── المزامنة الذكية ───
-async function syncToServer() {
-  if (isSyncing) return;
-  isSyncing = true;
-  try {
-    const resp = await fetch('/api/state');
-    if (resp.ok) {
-      const serverData = await resp.json();
-      for (const key of ['patients','tasks','handovers','clinicSlots','teamMembers','teamMessages']) {
-        if (serverData[key] && serverData[key].length > 0) {
-          const localMap = {};
-          state[key].forEach(item => { localMap[item.id] = item; });
-          serverData[key].forEach(serverItem => {
-            const localItem = localMap[serverItem.id];
-            if (!localItem || (serverItem.updatedAt||0) > (localItem.updatedAt||0)) {
-              state[key] = state[key].filter(i => i.id !== serverItem.id);
-              state[key].push(serverItem);
-            }
-          });
-          for (const localItem of state[key]) {
-            const serverItem = serverData[key].find(s => s.id === localItem.id);
-            if (!serverItem || (localItem.updatedAt||0) > (serverItem.updatedAt||0)) {
-              await fetch(`/api/${key}/${localItem.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localItem)
-              });
-            }
-          }
-        } else {
-          for (const item of state[key]) {
-            await fetch(`/api/${key}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
-            });
-          }
-        }
-      }
-      state.lastSync = Date.now();
-      state.isOffline = false;
-      document.getElementById('offlineBanner').classList.remove('visible');
-      await saveState();
-      updateSyncStatus(true);
-      showToast('🔄 تمت المزامنة مع الخادم');
-    }
-  } catch (e) {
-    state.isOffline = true;
-    document.getElementById('offlineBanner').classList.add('visible');
-    updateSyncStatus(false);
-    console.warn('⚠️ الخادم غير متاح:', e.message);
-    if (retryTimer) clearTimeout(retryTimer);
-    retryTimer = setTimeout(syncToServer, 30000);
-  } finally {
-    isSyncing = false;
+// ─── 2. تعريف الأدوار والصلاحيات ───
+const ROLES = {
+  senior: {
+    label: 'استشاري أول',
+    permissions: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients']
+  },
+  junior: {
+    label: 'طبيب مبتدئ',
+    permissions: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals']
+  },
+  nurse: {
+    label: 'ممرض',
+    permissions: ['update_vitals', 'view_patients', 'complete_tasks']
+  },
+  admin: {
+    label: 'إداري',
+    permissions: ['manage_clinic', 'view_patients', 'send_alerts']
   }
+};
+
+function hasPermission(role, perm) {
+  return ROLES[role] && ROLES[role].permissions.includes(perm);
 }
 
-function syncDelayed() {
-  if (syncDebounce) clearTimeout(syncDebounce);
-  syncDebounce = setTimeout(() => {
-    syncToServer();
-    syncDebounce = null;
-  }, 3000);
-}
-
-function updateSyncStatus(online) {
-  const dot = document.getElementById('syncDot');
-  const label = document.getElementById('syncLabel');
-  if (online) {
-    dot.className = 'dot online';
-    label.textContent = 'متصل';
-  } else {
-    dot.className = 'dot offline';
-    label.textContent = 'محلي';
-  }
-}
-
-// ─── أدوات مساعدة ───
+// ─── 3. دوال مساعدة ───
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function today() { return new Date().toISOString().split('T')[0]; }
 function timeNow() { return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); }
+function getRoleLabel(r) { return ROLES[r]?.label || r; }
+function getRoleEmoji(r) { const m = { senior:'👨‍⚕️', junior:'🧑‍⚕️', nurse:'👩‍⚕️', admin:'📋' }; return m[r]||'👤'; }
+function showToast(msg) { const old=document.querySelector('.toast'); if(old) old.remove(); const el=document.createElement('div'); el.className='toast'; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3000); }
+function openModal(html){ document.getElementById('modal').classList.remove('hidden'); document.getElementById('modalContent').innerHTML=html; }
+function closeModal(){ document.getElementById('modal').classList.add('hidden'); }
+function closeModalOverlay(e){ if(e.target===document.getElementById('modal')) closeModal(); }
+function toggleDrawer(){ document.getElementById('drawer').classList.toggle('open'); document.getElementById('drawerOverlay').classList.toggle('visible'); }
+function addAuditLog(action, details){ state.auditLog.push({timestamp:new Date().toISOString(), user:state.currentRole, action, details, id:uid()}); if(state.auditLog.length>100) state.auditLog=state.auditLog.slice(-100); }
 
-function getRoleLabel(role) {
-  const map = { senior: 'استشاري', junior: 'مبتدئ', nurse: 'ممرض', admin: 'إداري' };
-  return map[role] || role;
+// ─── 4. تحميل وحفظ البيانات ───
+async function loadState() {
+  try { const saved = await store.getItem('state'); if(saved) { if(saved._version !== state._version) migrateState(saved); else state = { ...state, ...saved }; } } catch(e){ console.warn(e); }
 }
-function getRoleEmoji(role) {
-  const map = { senior: '👨‍⚕️', junior: '🧑‍⚕️', nurse: '👩‍⚕️', admin: '📋' };
-  return map[role] || '👤';
+async function saveState() {
+  try { state._version='6.0.0'; await store.setItem('state', state); bus.emit('stateSaved'); } catch(e){ console.warn(e); }
 }
-function can(roles) { return roles.includes(state.currentRole); }
-
-function showToast(msg) {
-  const old = document.querySelector('.toast');
-  if (old) old.remove();
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
-}
-
-function openModal(html) {
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('modalContent').innerHTML = html;
-}
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
-function closeModalOverlay(e) { if (e.target === document.getElementById('modal')) closeModal(); }
-
-// ─── Drawer ───
-function toggleDrawer() {
-  const drawer = document.getElementById('drawer');
-  const overlay = document.getElementById('drawerOverlay');
-  drawer.classList.toggle('open');
-  overlay.classList.toggle('visible');
+function migrateState(old) {
+  // ترقية البيانات إذا تغير الإصدار
+  const merged = { ...state, ...old };
+  if(!merged.auditLog) merged.auditLog = [];
+  state = merged;
+  saveState();
 }
 
-// ─── البحث العالمي ───
-function searchGlobal(query) {
-  state.searchQuery = query.toLowerCase();
-  displayedCount = PAGE_SIZE;
-  render();
+// ─── 5. نظام الأحداث (Event Bus) ───
+const bus = {
+  events: {},
+  on(event, cb){ if(!this.events[event]) this.events[event]=[]; this.events[event].push(cb); },
+  off(event, cb){ if(!this.events[event]) return; this.events[event]=this.events[event].filter(f=>f!==cb); },
+  emit(event, data){ if(!this.events[event]) return; this.events[event].forEach(cb=>cb(data)); }
+};
+
+// ─── 6. التنقل وعناصر الواجهة ───
+let currentTab = 'dashboard';
+const tabs = [
+  { id: 'dashboard', icon: '📊', label: 'الرئيسية' },
+  { id: 'ward', icon: '🏥', label: 'الجناح' },
+  { id: 'clinic', icon: '🩺', label: 'العيادة' },
+  { id: 'tasks', icon: '📋', label: 'المهام' },
+  { id: 'team', icon: '👥', label: 'الفريق' },
+  { id: 'handover', icon: '📝', label: 'التسليم' },
+  { id: 'reports', icon: '📊', label: 'التقارير' }
+];
+
+function renderTabs() {
+  const container = document.getElementById('tabBar');
+  container.innerHTML = tabs.map(t => `
+    <div class="tab ${t.id===currentTab?'active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">
+      <span class="tab-icon">${t.icon}</span>
+      <span>${t.label}</span>
+      <span class="badge" id="badge_${t.id}">0</span>
+    </div>
+  `).join('');
+  // Drawer
+  const drawerContainer = document.getElementById('drawerItems');
+  drawerContainer.innerHTML = tabs.map(t => `
+    <div class="drawer-item ${t.id===currentTab?'active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}'); toggleDrawer();">
+      <span>${t.icon}</span> ${t.label}
+      <span class="badge" id="drawer_badge_${t.id}">0</span>
+    </div>
+  `).join('');
+  updateBadges();
 }
 
-function filterBySearch(items, searchFields) {
-  if (!state.searchQuery) return items;
-  return items.filter(item => {
-    return searchFields.some(field => {
-      const val = item[field];
-      return val && val.toString().toLowerCase().includes(state.searchQuery);
-    });
-  });
+function switchTab(tab) {
+  if(currentTab===tab) return;
+  currentTab = tab;
+  renderTabs();
+  renderContent();
+  updateBadges();
 }
 
-// ─── تحديث الشارات ───
-function updateBadges() {
-  const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'senior')).length;
-  document.getElementById('taskBadge').style.display = pending ? 'block' : 'none';
-  document.getElementById('taskBadge').textContent = pending;
-  document.getElementById('drawerTaskBadge').style.display = pending ? 'block' : 'none';
-  document.getElementById('drawerTaskBadge').textContent = pending;
-  
-  const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
-  document.getElementById('handoverBadge').style.display = urgent ? 'block' : 'none';
-  document.getElementById('handoverBadge').textContent = urgent;
-  document.getElementById('drawerHandoverBadge').style.display = urgent ? 'block' : 'none';
-  document.getElementById('drawerHandoverBadge').textContent = urgent;
-  
-  const unread = state.teamMessages.filter(m => !m.read).length;
-  document.getElementById('teamBadge').style.display = unread ? 'block' : 'none';
-  document.getElementById('teamBadge').textContent = unread;
-  document.getElementById('drawerTeamBadge').style.display = unread ? 'block' : 'none';
-  document.getElementById('drawerTeamBadge').textContent = unread;
-}
-
-// ─── تبديل الدور ───
 function switchRole(role) {
   state.currentRole = role;
-  saveState();
   document.getElementById('roleSelect').value = role;
   const adminBtn = document.getElementById('adminBtn');
   const drawerAdminBtn = document.getElementById('drawerAdminBtn');
-  if (role === 'senior') {
-    adminBtn.classList.add('visible');
-    drawerAdminBtn.style.display = 'flex';
-  } else {
-    adminBtn.classList.remove('visible');
-    drawerAdminBtn.style.display = 'none';
-  }
-  render();
-}
-
-// ─── التبديل بين الأقسام ───
-function showTab(tab) {
-  currentTab = tab;
-  displayedCount = PAGE_SIZE;
-  // تحديث القائمة الجانبية
-  document.querySelectorAll('.drawer-item').forEach(el => el.classList.remove('active'));
-  const drawerItem = document.querySelector(`.drawer-item[data-tab="${tab}"]`);
-  if (drawerItem) drawerItem.classList.add('active');
-  render();
-}
-
-// ─── Dashboard ───
-function renderDashboard(container) {
-  const activePatients = state.patients.filter(p => p.status !== 'discharged').length;
-  const pendingTasks = state.tasks.filter(t => !t.done).length;
-  const criticalPatients = state.patients.filter(p => p.patientStatus === 'critical').length;
-  const urgentHandovers = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
-  const totalPatients = state.patients.length;
-  container.innerHTML = `
-    <div class="dashboard">
-      <div class="stat-card primary"><div class="stat-number">${activePatients}</div><div class="stat-label">🩺 مرضى نشطون</div></div>
-      <div class="stat-card warning"><div class="stat-number">${pendingTasks}</div><div class="stat-label">📋 مهام معلقة</div></div>
-      <div class="stat-card danger"><div class="stat-number">${criticalPatients}</div><div class="stat-label">🚨 مرضى حرجون</div></div>
-      <div class="stat-card secondary"><div class="stat-number">${urgentHandovers}</div><div class="stat-label">📝 تسليم عاجل</div></div>
-      <div class="stat-card success" style="grid-column: span 2;"><div class="stat-number">${totalPatients}</div><div class="stat-label">🏥 إجمالي المرضى</div></div>
-    </div>
-  `;
-}
-
-// ─── التصيير الرئيسي مع Lazy Loading ───
-function render() {
+  if(role === 'senior') { adminBtn.classList.add('visible'); drawerAdminBtn.style.display = 'flex'; }
+  else { adminBtn.classList.remove('visible'); drawerAdminBtn.style.display = 'none'; }
+  saveState();
+  renderContent();
   updateBadges();
-  const container = document.getElementById('content');
+}
+
+function updateBadges() {
+  const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'senior')).length;
+  const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
+  const unread = state.teamMessages.filter(m => !m.read).length;
+  ['tasks','handover','team'].forEach(id => {
+    const b = document.getElementById(`badge_${id}`);
+    const db = document.getElementById(`drawer_badge_${id}`);
+    const count = id==='tasks'?pending : id==='handover'?urgent : unread;
+    if(b){ b.style.display=count?'block':'none'; b.textContent=count; }
+    if(db){ db.style.display=count?'block':'none'; db.textContent=count; }
+  });
+}
+
+// ─── 7. البحث العالمي ───
+function searchGlobal(query) {
+  state.searchQuery = query.toLowerCase();
+  renderContent();
+}
+
+function filterBySearch(items, fields) {
+  if(!state.searchQuery) return items;
+  return items.filter(item => fields.some(f => item[f] && item[f].toString().toLowerCase().includes(state.searchQuery)));
+}
+
+// ─── 8. التصيير الرئيسي ───
+function renderContent() {
+  const container = document.getElementById('appContent');
   container.innerHTML = '';
-  
-  // Dashboard
+  // Dashboard دائماً في الأعلى
   renderDashboard(container);
-  
   // المحتوى حسب التبويب
   switch(currentTab) {
+    case 'dashboard': renderDashboardFull(container); break;
     case 'ward': renderWard(container); break;
     case 'clinic': renderClinic(container); break;
     case 'tasks': renderTasks(container); break;
@@ -986,799 +382,406 @@ function render() {
     case 'handover': renderHandover(container); break;
     case 'reports': renderReports(container); break;
   }
-  
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  const active = document.querySelector(`.tab[data-tab="${currentTab}"]`);
-  if (active) active.classList.add('active');
-  
-  const adminBtn = document.getElementById('adminBtn');
-  const drawerAdminBtn = document.getElementById('drawerAdminBtn');
-  if (state.currentRole === 'senior') {
-    adminBtn.classList.add('visible');
-    drawerAdminBtn.style.display = 'flex';
-  } else {
-    adminBtn.classList.remove('visible');
-    drawerAdminBtn.style.display = 'none';
-  }
-  
-  // تحديث القائمة الجانبية
-  document.querySelectorAll('.drawer-item').forEach(el => el.classList.remove('active'));
-  const drawerItem = document.querySelector(`.drawer-item[data-tab="${currentTab}"]`);
-  if (drawerItem) drawerItem.classList.add('active');
+  updateBadges();
 }
 
-// ─── Lazy Loading Helper ───
-function renderLazy(items, renderItemFn, container, key) {
-  const total = items.length;
-  const displayed = items.slice(0, displayedCount);
-  
-  displayed.forEach(item => {
-    container.innerHTML += renderItemFn(item);
+function renderDashboard(container) {
+  const active = state.patients.filter(p => p.status !== 'discharged').length;
+  const pending = state.tasks.filter(t => !t.done).length;
+  const critical = state.patients.filter(p => p.workflowStage === 3 && p.status==='admitted').length;
+  const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
+  container.innerHTML += `
+    <div class="dashboard">
+      <div class="stat-card primary"><div class="stat-number">${active}</div><div class="stat-label">🩺 مرضى نشطون</div></div>
+      <div class="stat-card warning"><div class="stat-number">${pending}</div><div class="stat-label">📋 مهام معلقة</div></div>
+      <div class="stat-card danger"><div class="stat-number">${critical}</div><div class="stat-label">🚨 تنفيذ (حرج)</div></div>
+      <div class="stat-card secondary"><div class="stat-number">${urgent}</div><div class="stat-label">📝 تسليم عاجل</div></div>
+      <div class="stat-card success" style="grid-column: span 2;"><div class="stat-number">${state.patients.length}</div><div class="stat-label">🏥 إجمالي المرضى</div></div>
+    </div>
+  `;
+}
+
+function renderDashboardFull(container) {
+  // عرض موجز للمرضى حسب المرحلة
+  const stages = ['الاستقبال', 'الخطة', 'التنفيذ', 'الخروج'];
+  const counts = [0,0,0,0];
+  state.patients.filter(p => p.status !== 'discharged').forEach(p => {
+    if(p.workflowStage>=1 && p.workflowStage<=4) counts[p.workflowStage-1]++;
   });
-  
-  if (displayedCount < total) {
-    const loader = document.createElement('div');
-    loader.className = 'lazy-loader';
-    loader.id = 'lazyLoader';
-    loader.innerHTML = `<div class="spinner"></div><p style="margin-top:8px;">جاري تحميل المزيد...</p>`;
-    container.appendChild(loader);
-    
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        observer.disconnect();
-        displayedCount += PAGE_SIZE;
-        // إزالة مؤقت التحميل وإعادة الرندر
-        render();
-      }
-    }, { rootMargin: '0px 0px 100px 0px' });
-    observer.observe(loader);
-  }
+  container.innerHTML += `
+    <div class="card"><div class="title">📈 توزيع المرضى حسب المرحلة</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+        ${stages.map((s,i) => `<div><span class="status-badge stage${i+1}">${s}</span> ${counts[i]} مريض</div>`).join('')}
+      </div>
+    </div>
+    <div class="card"><div class="title">📋 آخر المهام</div>
+      ${state.tasks.filter(t=>!t.done).slice(0,3).map(t => `<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #e2e8f0;">${t.text} (${getRoleLabel(t.assignee)})</div>`).join('')||'<div class="text-muted">لا توجد مهام معلقة</div>'}
+    </div>
+  `;
 }
 
-// ─── الجناح (Ward) ───
+// ─── 9. الجناح (Ward) مع سير العمل ───
 function renderWard(container) {
   let active = state.patients.filter(p => p.status !== 'discharged');
+  active = filterBySearch(active, ['name','diagnosis','bed']);
   const discharged = state.patients.filter(p => p.status === 'discharged');
-  active = filterBySearch(active, ['name', 'diagnosis', 'bed']);
-  
   let html = `
-    <div class="flex-between mb-8">
-      <h2 style="font-size:18px;">🏥 الجناح</h2>
-      ${can(['senior','junior']) ? `<button class="small" onclick="showAdmissionFormWizard()">➕ قبول</button>` : ''}
+    <div class="flex-between mb-8"><h2 style="font-size:18px;">🏥 الجناح</h2>
+      ${hasPermission(state.currentRole,'admit') ? `<button class="small" onclick="showAdmissionWizard()">➕ قبول</button>` : ''}
     </div>
     <div class="text-muted text-sm">👥 ${active.length} مريض نشط · ${discharged.length} مكتمل</div>
   `;
-  
-  if (!active.length) {
-    html += `<div class="empty-state"><div class="emoji">🛏️</div><p>${state.searchQuery ? 'لا توجد نتائج بحث' : 'لا يوجد مرضى نشطين'}</p></div>`;
+  if(!active.length) {
+    html += `<div class="empty-state"><div class="emoji">🛏️</div><p>${state.searchQuery?'لا توجد نتائج بحث':'لا يوجد مرضى نشطين'}</p></div>`;
   } else {
-    renderLazy(active, (p) => {
-      const statusClass = p.patientStatus || 'stable';
-      const statusMap = { stable: 'مستقر', monitoring: 'مراقبة', critical: 'حرج', intervention: 'يحتاج تدخل' };
-      const statusLabel = statusMap[statusClass] || 'مستقر';
-      const statusBadgeClass = statusClass === 'critical' ? 'critical' : statusClass === 'intervention' ? 'intervention' : statusClass === 'monitoring' ? 'monitoring' : 'stable';
-      return `
-        <div class="card clickable" onclick="viewPatientSnapshot('${p.id}')" style="border-right-color:${statusClass === 'critical' ? 'var(--danger)' : statusClass === 'intervention' ? 'var(--warning)' : 'var(--primary)'};">
+    active.forEach(p => {
+      const stage = p.workflowStage || 1;
+      const stageLabels = ['الاستقبال', 'الخطة', 'التنفيذ', 'الخروج'];
+      const stageClass = `stage${stage}`;
+      html += `
+        <div class="card clickable" onclick="viewPatient('${p.id}')" style="border-right-color:${stage===3?'var(--danger)':stage===2?'var(--warning)':'var(--primary)'};">
           <div class="flex-between">
-            <div>
-              <div class="title">${p.name} <span class="text-muted text-sm">(${p.age}س)</span></div>
-              <div class="sub">${p.diagnosis} · سرير ${p.bed}</div>
-            </div>
-            <span class="status-badge ${statusBadgeClass}">${statusLabel}</span>
+            <div><div class="title">${p.name} <span class="text-muted text-sm">(${p.age}س)</span></div>
+            <div class="sub">${p.diagnosis} · سرير ${p.bed}</div></div>
+            <span class="status-badge ${stageClass}">${stageLabels[stage-1]}</span>
           </div>
           <div class="meta"><span>⚖️ ${p.weight}كجم</span><span>🩺 ${p.vitals || '—'}</span></div>
           <div class="actions">
-            ${can(['nurse','senior']) ? `<button class="small secondary" onclick="event.stopPropagation();updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
-            ${can(['senior']) ? `<button class="small secondary" onclick="event.stopPropagation();changePatientStatus('${p.id}')">🔄 حالة</button>` : ''}
-            ${can(['junior','senior']) ? `<button class="small secondary" onclick="event.stopPropagation();addNote('${p.id}')">📝 ملاحظة</button>` : ''}
-            ${can(['senior']) ? `<button class="small danger" onclick="event.stopPropagation();dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
+            ${hasPermission(state.currentRole,'update_vitals') ? `<button class="small secondary" onclick="event.stopPropagation();updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
+            ${hasPermission(state.currentRole,'write_notes') ? `<button class="small secondary" onclick="event.stopPropagation();addNote('${p.id}')">📝 ملاحظة</button>` : ''}
+            ${hasPermission(state.currentRole,'discharge') ? `<button class="small danger" onclick="event.stopPropagation();dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
+            ${hasPermission(state.currentRole,'approve_plan') ? `<button class="small secondary" onclick="event.stopPropagation();advanceStage('${p.id}')">➡️ تقدم</button>` : ''}
           </div>
         </div>
       `;
-    }, container, 'patients');
+    });
   }
-  
-  if (discharged.length) {
+  if(discharged.length) {
     html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ مكتمل (${discharged.length})</summary>`;
     discharged.forEach(p => {
       html += `<div class="card" style="border-right-color:var(--gray);opacity:0.6;"><div class="flex-between"><span class="title" style="font-size:13px;">${p.name}</span><span class="status-badge discharged">مكتمل</span></div><div class="sub">${p.diagnosis} · ${p.age}س</div></div>`;
     });
     html += `</details>`;
   }
-  
   container.innerHTML += html;
 }
 
-// ─── تغيير حالة المريض ───
-function changePatientStatus(id) {
-  const p = state.patients.find(p => p.id === id);
-  if (!p) return;
-  const newStatus = prompt('اختر الحالة (stable, monitoring, critical, intervention):', p.patientStatus || 'stable');
-  if (newStatus && ['stable','monitoring','critical','intervention'].includes(newStatus)) {
-    p.patientStatus = newStatus;
-    p.updatedAt = Date.now();
-    addAuditLog('تغيير حالة المريض', `تم تغيير حالة ${p.name} إلى ${newStatus}`);
-    saveState();
-    render();
-    showToast('✅ تم تحديث حالة المريض');
-  }
-}
-
-// ─── نموذج القبول على خطوات (Wizard) ───
-let wizardData = {};
-function showAdmissionFormWizard() {
-  wizardData = {};
-  let step = 1;
-  const totalSteps = 3;
-  
-  function renderWizardStep(step) {
-    let html = `
-      <h2>➕ قبول مريض جديد</h2>
-      <div class="wizard-progress">
-        ${[1,2,3].map(s => `
-          <div class="step-indicator">
-            <div class="step-circle ${s === step ? 'active' : s < step ? 'done' : ''}">${s < step ? '✓' : s}</div>
-            <div class="step-label">${s === 1 ? 'معلومات أساسية' : s === 2 ? 'بيانات سريرية' : 'تاريخ مرضي'}</div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="wizard-step ${step === 1 ? 'active' : ''}" data-step="1">
-        <label>الاسم *</label><input id="admName" value="${wizardData.name||''}" placeholder="مثال: نور الهاشمي">
-        <div class="form-row">
-          <div><label>العمر (سنة) *</label><input id="admAge" type="number" value="${wizardData.age||''}" placeholder="3" min="0.1" step="0.1"></div>
-          <div><label>الوزن (كجم) *</label><input id="admWeight" type="number" step="0.1" value="${wizardData.weight||''}" placeholder="14" min="0.1"></div>
-        </div>
-        <div class="form-row">
-          <div><label>الطول (سم)</label><input id="admHeight" type="number" step="0.1" value="${wizardData.height||''}" placeholder="95"></div>
-          <div><label>السرير *</label><input id="admBed" value="${wizardData.bed||''}" placeholder="مثال: PICU-2"></div>
-        </div>
-        <button onclick="wizardNext(1)" class="block">التالي →</button>
-      </div>
-      <div class="wizard-step ${step === 2 ? 'active' : ''}" data-step="2">
-        <label>التشخيص *</label><input id="admDiagnosis" value="${wizardData.diagnosis||''}" placeholder="مثال: التهاب القصيبات">
-        <label>مصدر الدخول</label>
-        <select id="admSource" class="form-input"><option value="ER">الطوارئ</option><option value="OPD">العيادة</option><option value="Transfer">تحويل</option></select>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="wizardPrev(2)" class="secondary">← السابق</button>
-          <button onclick="wizardNext(2)" class="block" style="flex:1;">التالي →</button>
-        </div>
-      </div>
-      <div class="wizard-step ${step === 3 ? 'active' : ''}" data-step="3">
-        <label>التاريخ المرضي والفحص</label>
-        <textarea id="admHistory" placeholder="الملاحظات السريرية...">${wizardData.history||''}</textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="wizardPrev(3)" class="secondary">← السابق</button>
-          <button onclick="wizardSubmit()" class="success" style="flex:1;">✅ قبول</button>
-        </div>
-      </div>
-    `;
-    openModal(html);
-  }
-  
-  window.wizardNext = function(currentStep) {
-    // حفظ البيانات من الخطوة الحالية
-    if (currentStep === 1) {
-      wizardData.name = document.getElementById('admName')?.value || '';
-      wizardData.age = document.getElementById('admAge')?.value || '';
-      wizardData.weight = document.getElementById('admWeight')?.value || '';
-      wizardData.height = document.getElementById('admHeight')?.value || '';
-      wizardData.bed = document.getElementById('admBed')?.value || '';
-      if (!wizardData.name || !wizardData.age || !wizardData.weight || !wizardData.bed) {
-        alert('⚠️ جميع الحقول المطلوبة في هذه الخطوة يجب تعبئتها');
-        return;
-      }
-    } else if (currentStep === 2) {
-      wizardData.diagnosis = document.getElementById('admDiagnosis')?.value || '';
-      wizardData.source = document.getElementById('admSource')?.value || 'ER';
-      if (!wizardData.diagnosis) {
-        alert('⚠️ التشخيص مطلوب');
-        return;
-      }
-    }
-    renderWizardStep(currentStep + 1);
-  };
-  
-  window.wizardPrev = function(currentStep) {
-    if (currentStep === 2) {
-      wizardData.diagnosis = document.getElementById('admDiagnosis')?.value || '';
-      wizardData.source = document.getElementById('admSource')?.value || 'ER';
-    } else if (currentStep === 3) {
-      wizardData.history = document.getElementById('admHistory')?.value || '';
-    }
-    renderWizardStep(currentStep - 1);
-  };
-  
-  window.wizardSubmit = function() {
-    wizardData.history = document.getElementById('admHistory')?.value || '';
-    admitPatientWizard();
-  };
-  
-  renderWizardStep(1);
-}
-
-function admitPatientWizard() {
-  const { name, age, weight, height, bed, diagnosis, source, history } = wizardData;
-  if (!name || isNaN(parseFloat(age)) || parseFloat(age) <= 0 || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0 || !bed || !diagnosis) {
-    alert('⚠️ جميع الحقول المطلوبة يجب تعبئتها بشكل صحيح');
-    return;
-  }
-  const id = 'p' + uid();
-  state.patients.push({
-    id, name, age: parseFloat(age), weight: parseFloat(weight), height: parseFloat(height) || null,
-    bed, diagnosis, status: 'admitted', vitals: '', fluids: '', meds: '',
-    notes: history || '', admissionDate: today(), dischargeDate: null,
-    source, patientStatus: 'stable',
-    dischargeChecklist: { summary: false, meds: false, followUp: false, education: false, signature: false },
-    vitalsHistory: [], updatedAt: Date.now()
-  });
-  addAuditLog('قبول مريض', `تم قبول ${name}`);
-  state.tasks.push({
-    id: 't' + uid(),
-    text: `تقييم كامل لـ ${name}`,
-    priority: 'high', assignee: 'junior', done: false,
-    createdAt: today(), dueDate: today(), dueTime: timeNow(), reminded: false,
-    updatedAt: Date.now()
-  });
-  saveState();
-  closeModal();
-  render();
-  showToast(`✅ تم قبول ${name}`);
-}
-
-// ─── تحديث الفحوصات ───
-function updateVitals(id) {
-  const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
-  if (val === null) return;
-  const p = state.patients.find(p => p.id === id);
-  if (p) {
-    const record = { timestamp: new Date().toISOString(), vitals: val };
-    if (!p.vitalsHistory) p.vitalsHistory = [];
-    p.vitalsHistory.push(record);
-    p.vitals = val;
-    p.updatedAt = Date.now();
-    addAuditLog('تحديث فحوصات', `تم تحديث فحوصات ${p.name} إلى ${val}`);
-    saveState();
-    render();
-    showToast('✅ تم تحديث الفحوصات');
-  }
-}
-
-// ─── إضافة ملاحظة ───
-function addNote(id) {
-  const note = prompt('أضف ملاحظة سريرية:');
-  if (!note) return;
-  const p = state.patients.find(p => p.id === id);
-  if (p) {
-    p.notes = (p.notes || '') + '\n' + today() + ' ' + timeNow() + ': ' + note;
-    p.updatedAt = Date.now();
-    addAuditLog('إضافة ملاحظة', `أضاف ملاحظة لـ ${p.name}: ${note}`);
-    saveState();
-    render();
-    showToast('📝 تم إضافة الملاحظة');
-  }
-}
-
-// ─── خروج المريض (مع قائمة تدقيق) ───
-function dischargePatient(id) {
-  const p = state.patients.find(p => p.id === id);
-  if (!p) return;
-  openModal(`
-    <h2>📋 خروج المريض: ${p.name}</h2>
-    <div style="margin:12px 0;background:#f8fafc;padding:12px;border-radius:8px;"><p style="font-size:13px;color:#475569;">يرجى التأكد من استكمال جميع بنود قائمة التدقيق</p></div>
-    <div style="margin:10px 0;">
-      <label class="check-label"><input type="checkbox" id="dcSummary" ${p.dischargeChecklist?.summary?'checked':''}> ✅ تم إعداد ملخص الخروج</label>
-      <label class="check-label"><input type="checkbox" id="dcMeds" ${p.dischargeChecklist?.meds?'checked':''}> ✅ تم شرح الأدوية</label>
-      <label class="check-label"><input type="checkbox" id="dcFollow" ${p.dischargeChecklist?.followUp?'checked':''}> ✅ تم تحديد موعد المتابعة</label>
-      <label class="check-label"><input type="checkbox" id="dcEducation" ${p.dischargeChecklist?.education?'checked':''}> ✅ تم تثقيف المريض والعائلة</label>
-      <label class="check-label"><input type="checkbox" id="dcSignature" ${p.dischargeChecklist?.signature?'checked':''}> ✅ توقيع الطبيب المعالج</label>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button onclick="saveDischargeChecklist('${p.id}')" class="secondary small">💾 حفظ القائمة</button>
-      <button onclick="finalizeDischarge('${p.id}')" class="success" style="flex:1;">✍️ تأكيد الخروج</button>
-    </div>
-    <button class="secondary block" style="margin-top:8px;" onclick="closeModal()">إلغاء</button>
-  `);
-}
-
-function saveDischargeChecklist(id) {
-  const p = state.patients.find(p => p.id === id);
-  if (!p) return;
-  p.dischargeChecklist = {
-    summary: document.getElementById('dcSummary').checked,
-    meds: document.getElementById('dcMeds').checked,
-    followUp: document.getElementById('dcFollow').checked,
-    education: document.getElementById('dcEducation').checked,
-    signature: document.getElementById('dcSignature').checked
-  };
+// ─── 10. إدارة سير العمل (Workflow) ───
+function advanceStage(id) {
+  const p = state.patients.find(pt => pt.id === id);
+  if(!p) return;
+  if(p.workflowStage >= 4) { showToast('⚠️ المريض في المرحلة النهائية'); return; }
+  p.workflowStage = (p.workflowStage || 1) + 1;
   p.updatedAt = Date.now();
-  addAuditLog('تحديث قائمة الخروج', `تم تحديث قائمة خروج ${p.name}`);
+  addAuditLog('تقدم المرحلة', `${p.name} → المرحلة ${p.workflowStage}`);
   saveState();
-  showToast('✅ تم حفظ قائمة التدقيق');
+  renderContent();
+  showToast(`✅ تم تقدم ${p.name} إلى المرحلة ${p.workflowStage}`);
 }
 
-function finalizeDischarge(id) {
-  const p = state.patients.find(p => p.id === id);
-  if (!p) return;
-  const checkboxes = document.querySelectorAll('#modal input[type="checkbox"]');
-  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-  if (!allChecked) {
-    alert('⚠️ يجب استكمال جميع بنود قائمة التدقيق قبل تأكيد الخروج');
-    return;
-  }
-  if (!confirm(`تأكيد خروج ${p.name}؟`)) return;
-  p.status = 'discharged';
-  p.dischargeDate = today();
-  p.updatedAt = Date.now();
-  addAuditLog('خروج مريض', `تم خروج ${p.name}`);
-  state.tasks.push({
-    id: 't' + uid(),
-    text: `ملخص خروج ${p.name}`,
-    priority: 'medium', assignee: 'junior', done: true,
-    createdAt: today(), dueDate: today(), dueTime: timeNow(), reminded: false,
-    updatedAt: Date.now()
-  });
-  saveState();
-  closeModal();
-  render();
-  showToast(`⬆️ تم خروج ${p.name}`);
-}
+// ─── 11. عرض تفاصيل المريض (Snapshot مع سير العمل) ───
+let selectedPatient = null;
 
-// ─── اللقطة الشاملة ───
-function viewPatientSnapshot(id) {
-  const p = state.patients.find(p => p.id === id);
-  if (!p) return;
+function viewPatient(id) {
+  const p = state.patients.find(pt => pt.id === id);
+  if(!p) return;
   selectedPatient = p;
-  snapshotTab = 'overview';
-  const tabs = [
-    { id: 'overview', label: 'نظرة عامة' },
-    { id: 'vitals', label: 'فحوصات' },
-    { id: 'growth', label: 'نمو' },
-    { id: 'meds', label: 'أدوية' },
-    { id: 'notes', label: 'ملاحظات' },
-    { id: 'discharge', label: 'تخريج' }
-  ];
-  let tabHtml = tabs.map((t,i) => `<div class="snapshot-tab ${i===0?'active':''}" data-stab="${t.id}" onclick="switchSnapshotTab('${t.id}')">${t.label}</div>`).join('');
-  openModal(`
+  const stageLabels = ['الاستقبال والتقييم', 'وضع الخطة العلاجية', 'التنفيذ والمتابعة', 'الخروج والمتابعة'];
+  const stageEmojis = ['📥', '📋', '⚕️', '🚪'];
+  let html = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
       <button class="small secondary" onclick="closeModal()">← رجوع</button>
       <h2 style="margin:0;">${p.name}</h2>
       <span class="text-muted text-sm">${p.age}س · ${p.weight}كجم</span>
     </div>
-    <div class="snapshot-tabs">${tabHtml}</div>
-    <div id="snapshotContent"></div>
-  `);
-  renderSnapshotTab('overview');
-}
-
-function switchSnapshotTab(tab) {
-  snapshotTab = tab;
-  document.querySelectorAll('.snapshot-tab').forEach(el => el.classList.toggle('active', el.dataset.stab === tab));
-  renderSnapshotTab(tab);
-}
-
-function renderSnapshotTab(tab) {
-  const p = selectedPatient;
-  if (!p) return;
-  const container = document.getElementById('snapshotContent');
-  if (!container) return;
-  
-  switch(tab) {
-    case 'overview':
-      container.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;">
-          <div><b>التشخيص</b><br>${p.diagnosis}</div>
-          <div><b>السرير</b><br>${p.bed}</div>
-          <div><b>الفحوصات</b><br>${p.vitals || '—'}</div>
-          <div><b>السوائل</b><br>${p.fluids || '—'}</div>
-          <div><b>الأدوية</b><br>${p.meds || '—'}</div>
-          <div><b>تاريخ القبول</b><br>${p.admissionDate || '—'}</div>
-          <div><b>الحالة</b><br>${p.patientStatus || 'مستقر'}</div>
+    <div class="workflow-progress">
+      ${[1,2,3,4].map(s => `
+        <div class="workflow-step">
+          <div class="step-circle ${s === p.workflowStage ? 'active' : s < p.workflowStage ? 'done' : ''}">${s < p.workflowStage ? '✓' : s}</div>
+          <div class="step-label">${stageEmojis[s-1]} ${stageLabels[s-1].split(' ')[0]}</div>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">
-          <button class="small secondary" onclick="calcIVFluids()">💧 السوائل</button>
-          <button class="small secondary" onclick="calcEmergencyDrugs()">💊 الطوارئ</button>
-          <button class="small secondary" onclick="calcBilirubin()">🧪 الصفار</button>
-        </div>
-      `;
-      break;
-    case 'vitals':
-      let vHtml = `<div style="margin:8px 0;"><div><b>الفحوصات الحالية:</b> ${p.vitals || 'لا توجد'}</div>${can(['nurse','senior']) ? `<button class="small" onclick="updateVitals('${p.id}');closeModal();">➕ تحديث</button>` : ''}</div>`;
-      if (p.vitalsHistory && p.vitalsHistory.length > 0) {
-        vHtml += `<div style="max-height:200px;overflow-y:auto;font-size:12px;background:#f8fafc;padding:8px;border-radius:8px;">`;
-        p.vitalsHistory.slice().reverse().forEach(record => {
-          vHtml += `<div style="border-bottom:1px solid #e2e8f0;padding:4px 0;"><span class="text-muted">${new Date(record.timestamp).toLocaleString()}</span> → ${record.vitals}</div>`;
-        });
-        vHtml += `</div>`;
-      }
-      vHtml += `<div class="chart-wrap"><canvas id="vitalsChart" width="320" height="140"></canvas></div>`;
-      container.innerHTML = vHtml;
-      setTimeout(drawVitalsChartWithZones, 50);
-      break;
-    case 'growth':
-      container.innerHTML = `<div class="chart-wrap"><canvas id="growthChart" width="320" height="160"></canvas></div><div class="text-muted text-sm">⚖️ ${p.weight}كجم · 📏 ${p.height||'—'}سم · 🧑 ${p.age}سنة</div>`;
-      setTimeout(drawGrowthChart, 50);
-      break;
-    case 'meds':
-      container.innerHTML = `<label>الأدوية الحالية</label><textarea id="snapshotMeds">${p.meds || ''}</textarea><button onclick="saveSnapshotMeds()">💾 حفظ</button>`;
-      break;
-    case 'notes':
-      container.innerHTML = `<label>الملاحظات السريرية</label><textarea id="snapshotNotes">${p.notes || ''}</textarea><button onclick="saveSnapshotNotes()">💾 حفظ</button>`;
-      break;
-    case 'discharge':
-      const c = p.dischargeChecklist || {};
-      container.innerHTML = `
-        <h3 style="font-size:15px;margin:0 0 8px 0;">📋 قائمة التخريج</h3>
-        <label class="check-label"><input type="checkbox" id="dcSummary" ${c.summary?'checked':''}> تم إعداد الملخص</label>
-        <label class="check-label"><input type="checkbox" id="dcMeds" ${c.meds?'checked':''}> تم شرح الأدوية</label>
-        <label class="check-label"><input type="checkbox" id="dcFollow" ${c.followUp?'checked':''}> تم تحديد المتابعة</label>
-        <label class="check-label"><input type="checkbox" id="dcEducation" ${c.education?'checked':''}> تم تثقيف المريض</label>
-        <label class="check-label"><input type="checkbox" id="dcSignature" ${c.signature?'checked':''}> توقيع الطبيب</label>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="small" onclick="saveSnapshotDischargeChecklist()">💾 حفظ</button>
-          ${can(['senior']) ? `<button class="small danger" onclick="signDischarge()">✍️ توقيع الخروج</button>` : ''}
-        </div>
-      `;
-      break;
-  }
+      `).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;">
+      <div><b>التشخيص</b><br>${p.diagnosis}</div>
+      <div><b>السرير</b><br>${p.bed}</div>
+      <div><b>الفحوصات</b><br>${p.vitals || '—'}</div>
+      <div><b>الأدوية</b><br>${p.meds || '—'}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">
+      ${hasPermission(state.currentRole,'update_vitals') ? `<button class="small secondary" onclick="updateVitals('${p.id}');closeModal();">📊 فحوصات</button>` : ''}
+      ${hasPermission(state.currentRole,'write_notes') ? `<button class="small secondary" onclick="addNote('${p.id}');closeModal();">📝 ملاحظة</button>` : ''}
+      ${hasPermission(state.currentRole,'approve_plan') && p.workflowStage < 4 ? `<button class="small secondary" onclick="advanceStage('${p.id}');closeModal();">➡️ تقدم</button>` : ''}
+      ${hasPermission(state.currentRole,'discharge') ? `<button class="small danger" onclick="dischargePatient('${p.id}');closeModal();">⬆️ خروج</button>` : ''}
+    </div>
+    <div class="card" style="margin-top:8px;border-right-color:var(--gray);"><div class="title">📝 الملاحظات</div>
+      <div style="font-size:13px;max-height:120px;overflow-y:auto;">${p.notes || 'لا توجد ملاحظات'}</div>
+    </div>
+  `;
+  openModal(html);
 }
 
-function saveSnapshotMeds() {
-  const val = document.getElementById('snapshotMeds')?.value;
-  if (val !== undefined) {
-    selectedPatient.meds = val;
-    const p = state.patients.find(p => p.id === selectedPatient.id);
-    if (p) p.meds = val;
-    addAuditLog('تحديث الأدوية', `تم تحديث أدوية ${selectedPatient.name}`);
-    saveState();
-    showToast('✅ تم حفظ الأدوية');
-  }
-}
-
-function saveSnapshotNotes() {
-  const val = document.getElementById('snapshotNotes')?.value;
-  if (val !== undefined) {
-    selectedPatient.notes = val;
-    const p = state.patients.find(p => p.id === selectedPatient.id);
-    if (p) p.notes = val;
-    addAuditLog('تحديث الملاحظات', `تم تحديث ملاحظات ${selectedPatient.name}`);
-    saveState();
-    showToast('✅ تم حفظ الملاحظات');
-  }
-}
-
-function saveSnapshotDischargeChecklist() {
-  const c = {
-    summary: document.getElementById('dcSummary')?.checked || false,
-    meds: document.getElementById('dcMeds')?.checked || false,
-    followUp: document.getElementById('dcFollow')?.checked || false,
-    education: document.getElementById('dcEducation')?.checked || false,
-    signature: document.getElementById('dcSignature')?.checked || false
+// ─── 12. دوال الإجراءات (Admit, Vitals, Notes, Discharge) ───
+function showAdmissionWizard() {
+  let wizardData = {};
+  let step = 1;
+  const render = (s) => {
+    let html = `
+      <h2>➕ قبول مريض جديد</h2>
+      <div class="wizard-progress">
+        ${[1,2,3].map(st => `<div class="step-indicator"><div class="step-circle ${st===s?'active':st<s?'done':''}">${st<s?'✓':st}</div><div class="step-label">${st===1?'أساسية':st===2?'سريرية':'تاريخ'}</div></div>`).join('')}
+      </div>
+      <div class="wizard-step ${s===1?'active':''}" data-step="1">
+        <label>الاسم *</label><input id="admName" value="${wizardData.name||''}" placeholder="مثال: نور الهاشمي">
+        <div class="form-row"><div><label>العمر (سنة) *</label><input id="admAge" type="number" value="${wizardData.age||''}" placeholder="3"></div><div><label>الوزن (كجم) *</label><input id="admWeight" type="number" step="0.1" value="${wizardData.weight||''}" placeholder="14"></div></div>
+        <div class="form-row"><div><label>الطول (سم)</label><input id="admHeight" type="number" step="0.1" value="${wizardData.height||''}" placeholder="95"></div><div><label>السرير *</label><input id="admBed" value="${wizardData.bed||''}" placeholder="مثال: PICU-2"></div></div>
+        <button onclick="wizardNext(1)" class="block">التالي →</button>
+      </div>
+      <div class="wizard-step ${s===2?'active':''}" data-step="2">
+        <label>التشخيص *</label><input id="admDiagnosis" value="${wizardData.diagnosis||''}" placeholder="مثال: التهاب القصيبات">
+        <label>مصدر الدخول</label><select id="admSource" class="form-input"><option value="ER">الطوارئ</option><option value="OPD">العيادة</option><option value="Transfer">تحويل</option></select>
+        <div style="display:flex;gap:8px;margin-top:8px;"><button onclick="wizardPrev(2)" class="secondary">← السابق</button><button onclick="wizardNext(2)" class="block" style="flex:1;">التالي →</button></div>
+      </div>
+      <div class="wizard-step ${s===3?'active':''}" data-step="3">
+        <label>التاريخ المرضي والفحص</label><textarea id="admHistory" placeholder="الملاحظات السريرية...">${wizardData.history||''}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;"><button onclick="wizardPrev(3)" class="secondary">← السابق</button><button onclick="wizardSubmit()" class="success" style="flex:1;">✅ قبول</button></div>
+      </div>
+    `;
+    openModal(html);
   };
-  selectedPatient.dischargeChecklist = c;
-  const p = state.patients.find(p => p.id === selectedPatient.id);
-  if (p) p.dischargeChecklist = c;
-  addAuditLog('تحديث قائمة التخريج', `تم تحديث قائمة تخريج ${selectedPatient.name}`);
-  saveState();
-  showToast('✅ تم حفظ قائمة التخريج');
-}
-
-function signDischarge() {
-  if (!confirm(`تأكيد خروج ${selectedPatient.name}؟`)) return;
-  selectedPatient.status = 'discharged';
-  selectedPatient.dischargeDate = today();
-  const p = state.patients.find(p => p.id === selectedPatient.id);
-  if (p) { p.status = 'discharged'; p.dischargeDate = today(); }
-  addAuditLog('توقيع خروج', `تم توقيع خروج ${selectedPatient.name}`);
-  state.tasks.push({
-    id: 't' + uid(),
-    text: `ملخص خروج ${selectedPatient.name}`,
-    priority: 'medium', assignee: 'junior', done: true,
-    createdAt: today(), dueDate: today(), dueTime: timeNow(), reminded: false,
-    updatedAt: Date.now()
-  });
-  saveState();
-  closeModal();
-  render();
-  showToast(`⬆️ تم خروج ${selectedPatient.name}`);
-}
-
-// ─── الرسوم البيانية ───
-function drawVitalsChartWithZones() {
-  const canvas = document.getElementById('vitalsChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-  const p = selectedPatient;
-  let data = [];
-  if (p.vitalsHistory && p.vitalsHistory.length > 0) {
-    data = p.vitalsHistory.slice(-8).map((record, i) => {
-      const match = record.vitals.match(/HR:?(\d+)/i);
-      return match ? parseInt(match[1]) : 80 + i * 2;
-    });
-  }
-  if (data.length < 2) { data = [88, 92, 85, 95, 90, 100, 88, 93]; }
-  const range = 160;
-  const drawZone = (y1, y2, color, label) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(20, y1, W-40, y2-y1);
-    ctx.fillStyle = '#1e293b';
-    ctx.font = '8px system-ui';
-    ctx.fillText(label, 4, (y1+y2)/2 + 3);
-  };
-  const normalTop = H - 10 - (100/range)*(H-20);
-  const normalBottom = H - 10 - (60/range)*(H-20);
-  const warningTop = H - 10 - (120/range)*(H-20);
-  const warningBottom = H - 10 - (40/range)*(H-20);
-  drawZone(0, warningTop, 'rgba(239,68,68,0.2)', 'خطر');
-  drawZone(warningTop, normalTop, 'rgba(245,158,11,0.2)', 'تحذير');
-  drawZone(normalTop, normalBottom, 'rgba(34,197,94,0.2)', 'طبيعي');
-  drawZone(normalBottom, warningBottom, 'rgba(245,158,11,0.2)', 'تحذير');
-  drawZone(warningBottom, H-10, 'rgba(239,68,68,0.2)', 'خطر');
-  const step = (W - 40) / (data.length - 1);
-  ctx.beginPath();
-  ctx.strokeStyle = '#1a73e8';
-  ctx.lineWidth = 2;
-  data.forEach((v, i) => {
-    const x = 20 + i * step;
-    const y = H - 10 - (v/range)*(H-20);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  data.forEach((v, i) => {
-    const x = 20 + i * step;
-    const y = H - 10 - (v/range)*(H-20);
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a73e8';
-    ctx.fill();
-  });
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '9px system-ui';
-  ctx.fillText('مخطط HR مع مناطق مرجعية (طبيعي 60-100)', 10, 14);
-}
-
-function drawGrowthChart() {
-  const canvas = document.getElementById('growthChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-  const p = selectedPatient;
-  const age = Math.min(p.age || 1, 18);
-  const weight = Math.min(p.weight || 5, 40);
-  [[3,'#e2e8f0'],[50,'#94a3b8'],[97,'#e2e8f0']].forEach(r => {
-    ctx.beginPath();
-    ctx.strokeStyle = r[1];
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3,3]);
-    for (let a = 0; a <= 18; a += 0.5) {
-      const x = 30 + (a/18)*(W-60);
-      const base = 3 + a * 2.2;
-      const y = H - 20 - ((base * (r[0]/100) + 1)/45)*(H-40);
-      a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  window.wizardNext = (s) => {
+    if(s===1) {
+      wizardData.name = document.getElementById('admName')?.value||'';
+      wizardData.age = document.getElementById('admAge')?.value||'';
+      wizardData.weight = document.getElementById('admWeight')?.value||'';
+      wizardData.height = document.getElementById('admHeight')?.value||'';
+      wizardData.bed = document.getElementById('admBed')?.value||'';
+      if(!wizardData.name || !wizardData.age || !wizardData.weight || !wizardData.bed) { alert('⚠️ الحقول المطلوبة'); return; }
+    } else if(s===2) {
+      wizardData.diagnosis = document.getElementById('admDiagnosis')?.value||'';
+      wizardData.source = document.getElementById('admSource')?.value||'ER';
+      if(!wizardData.diagnosis) { alert('⚠️ التشخيص مطلوب'); return; }
     }
-    ctx.stroke();
-    ctx.setLineDash([]);
-  });
-  const px = 30 + (age/18)*(W-60);
-  const py = H - 20 - ((weight)/45)*(H-40);
-  ctx.fillStyle = '#1a73e8';
-  ctx.beginPath();
-  ctx.arc(px, py, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1a73e8';
-  ctx.font = 'bold 10px system-ui';
-  ctx.fillText(`● ${p.name} (${weight}كجم)`, px + 10, py + 3);
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '9px system-ui';
-  ctx.fillText('مخطط النمو (وزن/عمر) مع منحنيات مرجعية (3%, 50%, 97%)', 10, 14);
-}
-
-// ─── الحاسبات الطبية ───
-function calcIVFluids() {
-  const p = selectedPatient; if (!p) return alert('اختر مريضاً أولاً');
-  const w = p.weight || 10; let vol;
-  if (w <= 10) vol = w * 100;
-  else if (w <= 20) vol = 1000 + (w-10)*50;
-  else vol = 1500 + (w-20)*20;
-  alert(`💧 السوائل الوريدية للمحافظة (${w} كجم)\n${vol} مل/يوم ≈ ${Math.round(vol/24)} مل/ساعة`);
-}
-
-function calcEmergencyDrugs() {
-  const p = selectedPatient; if (!p) return alert('اختر مريضاً أولاً');
-  const w = p.weight || 10;
-  alert(`💊 الأدوية الطارئة (${w} كجم)\nأدرينالين 0.01 مغ/كجم = ${(w*0.01).toFixed(2)} مغ\nسالبوتامول بخاخ = ${w<20?'2.5':'5'} مغ\nديازيبام 0.2 مغ/كجم = ${(w*0.2).toFixed(1)} مغ\nغلوكوز 10% 2 مل/كجم = ${(w*2).toFixed(0)} مل`);
-}
-
-function calcBilirubin() {
-  const age = prompt('العمر بالساعات (حديث الولادة):');
-  const bili = prompt('البيليروبين الكلي (ميكرومول/لتر):');
-  const gestation = prompt('عمر الحمل (أسابيع):');
-  if (!age || !bili || !gestation) return;
-  const bil = parseFloat(bili), ga = parseInt(gestation);
-  if (isNaN(bil) || isNaN(ga)) return alert('أدخل أرقاماً صحيحة');
-  const threshold = ga < 38 ? 250 : 300;
-  if (bil > threshold) alert(`🧪 البيليروبين ${bil} > الحد ${threshold}. يُنصح بالعلاج الضوئي.`);
-  else alert(`🧪 البيليروبين ${bil} ضمن الحدود الطبيعية (<${threshold}).`);
-}
-
-// ─── العيادة ───
-function renderClinic(container) {
-  let slots = filterBySearch(state.clinicSlots, ['patientName', 'reason']);
-  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">🩺 العيادة</h2>${can(['admin']) ? `<button class="small" onclick="addClinicSlot()">➕ إضافة</button>` : ''}</div>`;
-  if (!slots.length) {
-    html += `<div class="empty-state"><div class="emoji">📋</div><p>${state.searchQuery ? 'لا توجد نتائج بحث' : 'لا توجد مواعيد'}</p></div>`;
-  } else {
-    slots.forEach(s => {
-      html += `<div class="card" style="border-right-color:${s.status === 'مكتمل' ? 'var(--success)' : 'var(--warning)'};">
-        <div class="flex-between"><div><div class="title">${s.patientName}</div><div class="sub">⏰ ${s.time} · ${s.age} سنة · ${s.reason}</div></div>
-        <span class="status-badge ${s.status === 'مكتمل' ? 'completed' : 'waiting'}">${s.status}</span></div>
-        ${can(['admin']) ? `<div class="actions"><button class="small secondary" onclick="updateClinicStatus('${s.id}','مكتمل')">✅ مكتمل</button><button class="small danger" onclick="removeClinicSlot('${s.id}')">🗑️</button></div>` : ''}
-      </div>`;
+    render(s+1);
+  };
+  window.wizardPrev = (s) => {
+    if(s===2) { wizardData.diagnosis = document.getElementById('admDiagnosis')?.value||''; wizardData.source = document.getElementById('admSource')?.value||'ER'; }
+    else if(s===3) { wizardData.history = document.getElementById('admHistory')?.value||''; }
+    render(s-1);
+  };
+  window.wizardSubmit = () => {
+    wizardData.history = document.getElementById('admHistory')?.value||'';
+    const {name, age, weight, height, bed, diagnosis, source, history} = wizardData;
+    if(!name || isNaN(parseFloat(age)) || parseFloat(age)<=0 || isNaN(parseFloat(weight)) || parseFloat(weight)<=0 || !bed || !diagnosis) {
+      alert('⚠️ جميع الحقول المطلوبة يجب تعبئتها بشكل صحيح');
+      return;
+    }
+    const id = 'p'+uid();
+    state.patients.push({
+      id, name, age:parseFloat(age), weight:parseFloat(weight), height:parseFloat(height)||null,
+      bed, diagnosis, status:'admitted', vitals:'', fluids:'', meds:'',
+      notes:history||'', admissionDate:today(), dischargeDate:null,
+      source, workflowStage:1,
+      dischargeChecklist:{summary:false, meds:false, followUp:false, education:false, signature:false},
+      vitalsHistory:[], updatedAt:Date.now()
     });
+    state.tasks.push({
+      id:'t'+uid(), text:`تقييم كامل لـ ${name}`, priority:'high', assignee:'junior', done:false,
+      createdAt:today(), dueDate:today(), dueTime:timeNow(), reminded:false, updatedAt:Date.now()
+    });
+    addAuditLog('قبول مريض', `تم قبول ${name}`);
+    saveState();
+    closeModal();
+    renderContent();
+    showToast(`✅ تم قبول ${name}`);
+  };
+  render(1);
+}
+
+function updateVitals(id) {
+  const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
+  if(val===null) return;
+  const p = state.patients.find(pt => pt.id === id);
+  if(p) {
+    if(!p.vitalsHistory) p.vitalsHistory = [];
+    p.vitalsHistory.push({timestamp:new Date().toISOString(), vitals:val});
+    p.vitals = val;
+    p.updatedAt = Date.now();
+    addAuditLog('تحديث فحوصات', `تم تحديث فحوصات ${p.name} إلى ${val}`);
+    saveState();
+    renderContent();
+    showToast('✅ تم تحديث الفحوصات');
   }
+}
+
+function addNote(id) {
+  const note = prompt('أضف ملاحظة سريرية:');
+  if(!note) return;
+  const p = state.patients.find(pt => pt.id === id);
+  if(p) {
+    p.notes = (p.notes||'') + '\n' + today() + ' ' + timeNow() + ': ' + note;
+    p.updatedAt = Date.now();
+    addAuditLog('إضافة ملاحظة', `أضاف ملاحظة لـ ${p.name}: ${note}`);
+    saveState();
+    renderContent();
+    showToast('📝 تم إضافة الملاحظة');
+  }
+}
+
+function dischargePatient(id) {
+  const p = state.patients.find(pt => pt.id === id);
+  if(!p) return;
+  // التحقق من اكتمال المرحلة 4
+  if(p.workflowStage < 4) { alert('⚠️ يجب إكمال جميع مراحل سير العمل قبل الخروج'); return; }
+  openModal(`
+    <h2>📋 خروج المريض: ${p.name}</h2>
+    <div style="margin:12px 0;background:#f8fafc;padding:12px;border-radius:8px;"><p style="font-size:13px;color:#475569;">يرجى التأكد من استكمال جميع البنود</p></div>
+    <div style="margin:10px 0;">
+      <label class="check-label"><input type="checkbox" id="dcSummary" ${p.dischargeChecklist?.summary?'checked':''}> ✅ ملخص الخروج</label>
+      <label class="check-label"><input type="checkbox" id="dcMeds" ${p.dischargeChecklist?.meds?'checked':''}> ✅ شرح الأدوية</label>
+      <label class="check-label"><input type="checkbox" id="dcFollow" ${p.dischargeChecklist?.followUp?'checked':''}> ✅ موعد المتابعة</label>
+      <label class="check-label"><input type="checkbox" id="dcEducation" ${p.dischargeChecklist?.education?'checked':''}> ✅ تثقيف المريض</label>
+      <label class="check-label"><input type="checkbox" id="dcSignature" ${p.dischargeChecklist?.signature?'checked':''}> ✅ توقيع الطبيب</label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="saveDischargeChecklist('${p.id}')" class="secondary small">💾 حفظ</button>
+      <button onclick="finalizeDischarge('${p.id}')" class="success" style="flex:1;">✍️ تأكيد الخروج</button>
+    </div>
+  `);
+  window.saveDischargeChecklist = (pid) => {
+    const p2 = state.patients.find(pt => pt.id === pid);
+    if(!p2) return;
+    p2.dischargeChecklist = {
+      summary: document.getElementById('dcSummary').checked,
+      meds: document.getElementById('dcMeds').checked,
+      followUp: document.getElementById('dcFollow').checked,
+      education: document.getElementById('dcEducation').checked,
+      signature: document.getElementById('dcSignature').checked
+    };
+    p2.updatedAt = Date.now();
+    addAuditLog('تحديث قائمة الخروج', `تم تحديث قائمة خروج ${p2.name}`);
+    saveState();
+    showToast('✅ تم حفظ القائمة');
+  };
+  window.finalizeDischarge = (pid) => {
+    const p2 = state.patients.find(pt => pt.id === pid);
+    if(!p2) return;
+    const allChecked = ['dcSummary','dcMeds','dcFollow','dcEducation','dcSignature'].every(id => document.getElementById(id).checked);
+    if(!allChecked) { alert('⚠️ يجب استكمال جميع بنود القائمة'); return; }
+    if(!confirm(`تأكيد خروج ${p2.name}؟`)) return;
+    p2.status = 'discharged';
+    p2.dischargeDate = today();
+    p2.updatedAt = Date.now();
+    addAuditLog('خروج مريض', `تم خروج ${p2.name}`);
+    state.tasks.push({
+      id:'t'+uid(), text:`ملخص خروج ${p2.name}`, priority:'medium', assignee:'junior', done:true,
+      createdAt:today(), dueDate:today(), dueTime:timeNow(), reminded:false, updatedAt:Date.now()
+    });
+    saveState();
+    closeModal();
+    renderContent();
+    showToast(`⬆️ تم خروج ${p2.name}`);
+  };
+}
+
+// ─── 13. بقية الأقسام (Clinic, Tasks, Team, Handover, Reports) ───
+// (مختصرة لكنها تعمل بنفس المنطق مع استخدام الصلاحيات)
+
+function renderClinic(container) {
+  let slots = filterBySearch(state.clinicSlots, ['patientName','reason']);
+  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">🩺 العيادة</h2>${hasPermission(state.currentRole,'manage_clinic') ? `<button class="small" onclick="addClinicSlot()">➕ إضافة</button>` : ''}</div>`;
+  if(!slots.length) html += `<div class="empty-state"><div class="emoji">📋</div><p>${state.searchQuery?'لا توجد نتائج':'لا توجد مواعيد'}</p></div>`;
+  else slots.forEach(s => {
+    html += `<div class="card" style="border-right-color:${s.status==='مكتمل'?'var(--success)':'var(--warning)'};"><div class="flex-between"><div><div class="title">${s.patientName}</div><div class="sub">⏰ ${s.time} · ${s.age} سنة · ${s.reason}</div></div><span class="status-badge ${s.status==='مكتمل'?'completed':'waiting'}">${s.status}</span></div>${hasPermission(state.currentRole,'manage_clinic') ? `<div class="actions"><button class="small secondary" onclick="updateClinicStatus('${s.id}','مكتمل')">✅ مكتمل</button><button class="small danger" onclick="removeClinicSlot('${s.id}')">🗑️</button></div>` : ''}</div>`;
+  });
   container.innerHTML += html;
 }
-
 function addClinicSlot() {
-  const time = prompt('الوقت (مثال: 10:30):');
-  const name = prompt('اسم المريض:');
-  const age = prompt('العمر:');
-  const reason = prompt('سبب الزيارة:');
-  if (!time || !name || !age || !reason) return;
-  state.clinicSlots.push({ id: 'c'+uid(), time, patientName: name, age: parseInt(age), reason, status: 'انتظار', updatedAt: Date.now() });
-  addAuditLog('إضافة موعد عيادة', `تم إضافة موعد لـ ${name}`);
-  saveState();
-  render();
-  showToast('✅ تمت إضافة الموعد');
+  const t=prompt('الوقت:'), n=prompt('الاسم:'), a=prompt('العمر:'), r=prompt('السبب:'); if(!t||!n||!a||!r) return;
+  state.clinicSlots.push({id:'c'+uid(), time:t, patientName:n, age:parseInt(a), reason:r, status:'انتظار', updatedAt:Date.now()});
+  addAuditLog('إضافة موعد', `موعد لـ ${n}`); saveState(); renderContent(); showToast('✅ تمت الإضافة');
 }
-
 function updateClinicStatus(id, status) {
-  const s = state.clinicSlots.find(s => s.id === id);
-  if (s) { s.status = status; s.updatedAt = Date.now(); addAuditLog('تحديث موعد', `تم تحديث موعد ${s.patientName} إلى ${status}`); saveState(); render(); showToast('✅ تم تحديث الحالة'); }
+  const s=state.clinicSlots.find(slot=>slot.id===id); if(s){s.status=status; s.updatedAt=Date.now(); addAuditLog('تحديث موعد', `${s.patientName} → ${status}`); saveState(); renderContent(); showToast('✅ تم التحديث');}
 }
+function removeClinicSlot(id) { if(!confirm('حذف؟')) return; const s=state.clinicSlots.find(slot=>slot.id===id); state.clinicSlots=state.clinicSlots.filter(slot=>slot.id!==id); if(s) addAuditLog('حذف موعد', `حذف موعد ${s.patientName}`); saveState(); renderContent(); }
 
-function removeClinicSlot(id) {
-  if (!confirm('حذف الموعد؟')) return;
-  const s = state.clinicSlots.find(s => s.id === id);
-  state.clinicSlots = state.clinicSlots.filter(s => s.id !== id);
-  if (s) addAuditLog('حذف موعد', `تم حذف موعد ${s.patientName}`);
-  saveState();
-  render();
-}
-
-// ─── المهام ───
 function renderTasks(container) {
-  let tasks = filterBySearch(state.tasks.filter(t => !t.done), ['text']);
-  let doneTasks = filterBySearch(state.tasks.filter(t => t.done), ['text']);
-  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">📋 المهام</h2>${can(['senior']) ? `<button class="small" onclick="addTask()">➕ إضافة</button>` : ''}</div>`;
-  if (!tasks.length) {
-    html += `<div class="empty-state"><div class="emoji">✅</div><p>${state.searchQuery ? 'لا توجد نتائج بحث' : 'لا توجد مهام معلقة'}</p></div>`;
-  } else {
-    tasks.forEach(t => {
-      const isMine = t.assignee === state.currentRole || state.currentRole === 'senior';
-      const isOverdue = t.dueDate && t.dueDate < today() && !t.done;
-      const isSoon = t.dueDate && t.dueDate === today() && !t.done;
-      let tagClass = t.priority;
-      if (isOverdue) tagClass = 'overdue';
-      else if (isSoon) tagClass = 'soon';
-      const dueDisplay = t.dueDate ? (t.dueTime ? `${t.dueDate} ${t.dueTime}` : t.dueDate) : '';
-      html += `<div class="card" style="border-right-color:${isOverdue ? 'var(--danger)' : isSoon ? 'var(--warning)' : t.priority === 'high' ? 'var(--danger)' : t.priority === 'medium' ? 'var(--warning)' : 'var(--gray)'};">
-        <div class="flex-between"><span class="title" style="font-size:14px;">${t.text} ${isOverdue ? '⏰' : isSoon ? '🕐' : ''}</span>
-        <span class="tag ${tagClass}">${isOverdue ? 'متأخرة' : isSoon ? 'مستحقة قريباً' : t.priority}</span></div>
-        <div class="sub">👤 ${getRoleLabel(t.assignee)} · ${t.createdAt || ''} ${dueDisplay ? '· استحقاق: ' + dueDisplay : ''}</div>
-        ${isMine ? `<div class="actions"><button class="small" onclick="toggleTask('${t.id}')">✅ إنجاز</button></div>` : ''}
-      </div>`;
-    });
-  }
-  if (doneTasks.length) {
+  let tasks = filterBySearch(state.tasks.filter(t=>!t.done), ['text']);
+  let doneTasks = filterBySearch(state.tasks.filter(t=>t.done), ['text']);
+  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">📋 المهام</h2>${hasPermission(state.currentRole,'create_task') ? `<button class="small" onclick="addTask()">➕ إضافة</button>` : ''}</div>`;
+  if(!tasks.length) html += `<div class="empty-state"><div class="emoji">✅</div><p>${state.searchQuery?'لا توجد نتائج':'لا توجد مهام معلقة'}</p></div>`;
+  else tasks.forEach(t => {
+    const isMine = t.assignee === state.currentRole || state.currentRole === 'senior';
+    const isOverdue = t.dueDate && t.dueDate < today() && !t.done;
+    const isSoon = t.dueDate && t.dueDate === today() && !t.done;
+    let tagClass = t.priority; if(isOverdue) tagClass='overdue'; else if(isSoon) tagClass='soon';
+    const dueDisplay = t.dueDate ? (t.dueTime ? `${t.dueDate} ${t.dueTime}` : t.dueDate) : '';
+    html += `<div class="card" style="border-right-color:${isOverdue?'var(--danger)':isSoon?'var(--warning)':t.priority==='high'?'var(--danger)':t.priority==='medium'?'var(--warning)':'var(--gray)'};">
+      <div class="flex-between"><span class="title" style="font-size:14px;">${t.text} ${isOverdue?'⏰':isSoon?'🕐':''}</span><span class="tag ${tagClass}">${isOverdue?'متأخرة':isSoon?'مستحقة قريباً':t.priority}</span></div>
+      <div class="sub">👤 ${getRoleLabel(t.assignee)} · ${t.createdAt||''} ${dueDisplay?'· استحقاق: '+dueDisplay:''}</div>
+      ${isMine ? `<div class="actions"><button class="small" onclick="toggleTask('${t.id}')">✅ إنجاز</button></div>` : ''}
+    </div>`;
+  });
+  if(doneTasks.length) {
     html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ منجزة (${doneTasks.length})</summary>`;
-    doneTasks.forEach(t => {
-      html += `<div class="card" style="border-right-color:var(--success);opacity:0.5;"><div class="flex-between"><span style="font-size:13px;">${t.text}</span><span class="done-badge">✓</span></div></div>`;
-    });
+    doneTasks.forEach(t => { html += `<div class="card" style="border-right-color:var(--success);opacity:0.5;"><div class="flex-between"><span style="font-size:13px;">${t.text}</span><span class="done-badge">✓</span></div></div>`; });
     html += `</details>`;
   }
   container.innerHTML += html;
 }
-
 function addTask() {
-  const text = prompt('وصف المهمة:');
-  if (!text) return;
-  const assignee = prompt('المسؤول (senior/junior/nurse):') || 'junior';
-  const priority = prompt('الأولوية (high/medium/low):') || 'medium';
-  const dueDate = prompt('تاريخ الاستحقاق (YYYY-MM-DD):') || today();
-  const dueTime = prompt('وقت الاستحقاق (HH:MM):') || timeNow();
-  state.tasks.push({
-    id: 't'+uid(), text, priority: priority.toLowerCase(),
-    assignee: assignee.toLowerCase(), done: false,
-    createdAt: today(), dueDate, dueTime, reminded: false,
-    updatedAt: Date.now()
-  });
-  addAuditLog('إضافة مهمة', `تم إضافة مهمة: ${text} لـ ${assignee}`);
-  saveState();
-  render();
-  showToast('📋 تمت إضافة المهمة');
+  const text=prompt('وصف المهمة:'); if(!text) return;
+  const assignee=prompt('المسؤول (senior/junior/nurse):')||'junior';
+  const priority=prompt('الأولوية (high/medium/low):')||'medium';
+  const dueDate=prompt('تاريخ الاستحقاق (YYYY-MM-DD):')||today();
+  const dueTime=prompt('وقت الاستحقاق (HH:MM):')||timeNow();
+  state.tasks.push({id:'t'+uid(), text, priority:priority.toLowerCase(), assignee:assignee.toLowerCase(), done:false, createdAt:today(), dueDate, dueTime, reminded:false, updatedAt:Date.now()});
+  addAuditLog('إضافة مهمة', `${text} لـ ${assignee}`); saveState(); renderContent(); showToast('📋 تمت الإضافة');
 }
-
 function toggleTask(id) {
-  const t = state.tasks.find(t => t.id === id);
-  if (t) {
-    t.done = !t.done;
-    t.updatedAt = Date.now();
-    addAuditLog('تحديث مهمة', `تم ${t.done ? 'إنجاز' : 'إعادة فتح'} مهمة: ${t.text}`);
-    saveState();
-    render();
-    showToast(t.done ? '✅ تم إنجاز المهمة' : '🔄 تم إعادة فتح المهمة');
-  }
+  const t=state.tasks.find(task=>task.id===id); if(t){t.done=!t.done; t.updatedAt=Date.now(); addAuditLog('تحديث مهمة', `${t.text} ${t.done?'تم إنجازها':'أعيد فتحها'}`); saveState(); renderContent(); showToast(t.done?'✅ تم إنجاز المهمة':'🔄 أعيد فتح المهمة');}
 }
 
-// ─── الفريق ───
 function renderTeam(container) {
-  let messages = filterBySearch(state.teamMessages, ['sender', 'text']);
+  let messages = filterBySearch(state.teamMessages, ['sender','text']);
   let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">👥 الفريق</h2><span class="text-muted">${state.teamMembers.length} أعضاء</span></div>
-    <div class="member-list">${state.teamMembers.map(m => `<span class="member">${getRoleEmoji(m.role)} ${m.name} <span class="role-tag">${getRoleLabel(m.role)}</span>${m.role === state.currentRole ? '⭐' : ''}</span>`).join('')}</div>
+    <div class="member-list">${state.teamMembers.map(m => `<span class="member">${getRoleEmoji(m.role)} ${m.name} <span class="role-tag">${getRoleLabel(m.role)}</span>${m.role===state.currentRole?'⭐':''}</span>`).join('')}</div>
     <div style="margin:10px 0;"><h3 style="font-size:14px;margin-bottom:4px;">💬 المحادثة</h3></div>`;
-  if (!messages.length) {
-    html += `<div class="empty-state"><div class="emoji">💬</div><p>${state.searchQuery ? 'لا توجد نتائج بحث' : 'لا توجد رسائل'}</p></div>`;
-  } else {
-    messages.slice().reverse().forEach(m => {
-      html += `<div class="message"><div class="flex-between"><span class="sender">${m.sender}</span><span class="time">${m.time}</span></div><div class="text">${m.text}</div></div>`;
-    });
-  }
+  if(!messages.length) html += `<div class="empty-state"><div class="emoji">💬</div><p>${state.searchQuery?'لا توجد نتائج':'لا توجد رسائل'}</p></div>`;
+  else messages.slice().reverse().forEach(m => { html += `<div class="message"><div class="flex-between"><span class="sender">${m.sender}</span><span class="time">${m.time}</span></div><div class="text">${m.text}</div></div>`; });
   html += `<div style="display:flex;gap:6px;margin-top:6px;"><textarea id="teamMsgInput" placeholder="اكتب رسالة..." style="flex:1;min-height:40px;margin:0;"></textarea><button onclick="sendTeamMsg()" style="align-self:flex-end;">إرسال</button></div>`;
   container.innerHTML += html;
 }
-
 function sendTeamMsg() {
-  const input = document.getElementById('teamMsgInput');
-  if (!input) return;
-  const msg = input.value.trim();
-  if (!msg) return;
-  const sender = state.teamMembers.find(m => m.role === state.currentRole)?.name || getRoleLabel(state.currentRole);
-  state.teamMessages.push({ sender, text: msg, time: timeNow(), read: false, updatedAt: Date.now() });
-  addAuditLog('رسالة فريق', `${sender}: ${msg}`);
-  input.value = '';
-  saveState();
-  render();
-  showToast('💬 تم إرسال الرسالة');
+  const input=document.getElementById('teamMsgInput'); if(!input) return; const msg=input.value.trim(); if(!msg) return;
+  const sender=state.teamMembers.find(m=>m.role===state.currentRole)?.name||getRoleLabel(state.currentRole);
+  state.teamMessages.push({sender, text:msg, time:timeNow(), read:false, updatedAt:Date.now()});
+  addAuditLog('رسالة فريق', `${sender}: ${msg}`); input.value=''; saveState(); renderContent(); showToast('💬 تم الإرسال');
 }
 
-// ─── التسليم ───
 function renderHandover(container) {
-  let handovers = filterBySearch(state.handovers, ['situation', 'background', 'assessment', 'recommendation', 'author', 'patientName']);
-  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">📝 التسليم</h2>${can(['junior','senior']) ? `<button class="small" onclick="createHandover()">➕ جديد</button>` : ''}</div>`;
-  const sorted = [...handovers].sort((a,b) => {
-    if (a.urgent && !a.acknowledged) return -1;
-    if (b.urgent && !b.acknowledged) return 1;
-    return 0;
+  let handovers = filterBySearch(state.handovers, ['situation','background','assessment','recommendation','author','patientName']);
+  let html = `<div class="flex-between mb-8"><h2 style="font-size:18px;">📝 التسليم</h2>${hasPermission(state.currentRole,'create_handover') ? `<button class="small" onclick="createHandover()">➕ جديد</button>` : ''}</div>`;
+  const sorted = [...handovers].sort((a,b) => (a.urgent&&!a.acknowledged)?-1:(b.urgent&&!b.acknowledged)?1:0);
+  if(!sorted.length) html += `<div class="empty-state"><div class="emoji">📄</div><p>${state.searchQuery?'لا توجد نتائج':'لا يوجد تسليم'}</p></div>`;
+  else sorted.forEach(h => {
+    const isUrgent = h.urgent && !h.acknowledged;
+    html += `<div class="card" style="border-right-color:${isUrgent?'var(--danger)':'var(--primary)'};">
+      <div class="flex-between"><span class="title" style="font-size:13px;">${h.date} · ${h.author}</span>
+      <div>${isUrgent?'<span class="urgent-badge" style="background:var(--danger);color:white;padding:1px 8px;border-radius:30px;font-size:10px;">🚨 عاجل</span>':''}${h.acknowledged?'<span class="done-badge" style="background:var(--success);color:white;padding:1px 8px;border-radius:30px;font-size:10px;">✓ تم الاستلام</span>':''}</div></div>
+      ${h.patientName ? `<div class="sub">👤 المريض: ${h.patientName}</div>` : ''}
+      <div style="font-size:12px;margin-top:4px;"><div><b>S:</b> ${h.situation}</div><div><b>B:</b> ${h.background}</div><div><b>A:</b> ${h.assessment}</div><div><b>R:</b> ${h.recommendation}</div></div>
+      ${!h.acknowledged ? `<div class="actions"><button class="small" onclick="acknowledgeHandover('${h.id}')">✓ استلام</button></div>` : ''}
+    </div>`;
   });
-  if (!sorted.length) {
-    html += `<div class="empty-state"><div class="emoji">📄</div><p>${state.searchQuery ? 'لا توجد نتائج بحث' : 'لا يوجد تسليم'}</p></div>`;
-  } else {
-    sorted.forEach(h => {
-      const isUrgent = h.urgent && !h.acknowledged;
-      html += `<div class="card" style="border-right-color:${isUrgent ? 'var(--danger)' : 'var(--primary)'};">
-        <div class="flex-between"><span class="title" style="font-size:13px;">${h.date} · ${h.author}</span>
-        <div>${isUrgent ? '<span class="urgent-badge">🚨 عاجل</span>' : ''}${h.acknowledged ? '<span class="done-badge">✓ تم الاستلام</span>' : ''}</div></div>
-        ${h.patientName ? `<div class="sub">👤 المريض: ${h.patientName}</div>` : ''}
-        <div style="font-size:12px;margin-top:4px;"><div><b>S:</b> ${h.situation}</div><div><b>B:</b> ${h.background}</div><div><b>A:</b> ${h.assessment}</div><div><b>R:</b> ${h.recommendation}</div></div>
-        ${!h.acknowledged ? `<div class="actions"><button class="small" onclick="acknowledgeHandover('${h.id}')">✓ استلام</button></div>` : ''}
-      </div>`;
-    });
-  }
   container.innerHTML += html;
 }
-
 function createHandover() {
   openModal(`
     <h2>📝 تسليم جديد (SBAR)</h2>
     <div style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:8px;font-size:13px;color:var(--gray);">⚠️ جميع الحقول مطلوبة</div>
-    <label>المريض</label>
-    <select id="hoPatient" class="form-input">
-      <option value="">اختر مريضاً (اختياري)</option>
-      ${state.patients.filter(p => p.status !== 'discharged').map(p => `<option value="${p.id}">${p.name} (${p.diagnosis})</option>`).join('')}
-    </select>
+    <label>المريض</label><select id="hoPatient" class="form-input"><option value="">اختر مريضاً (اختياري)</option>${state.patients.filter(p=>p.status!=='discharged').map(p=>`<option value="${p.id}">${p.name} (${p.diagnosis})</option>`).join('')}</select>
     <label>الموقف (S) *</label><input id="hoS" placeholder="ماذا يحدث؟">
     <label>الخلفية (B) *</label><input id="hoB" placeholder="التاريخ المرضي؟">
     <label>التقييم (A) *</label><input id="hoA" placeholder="التشخيص؟">
@@ -1786,152 +789,83 @@ function createHandover() {
     <label class="check-label" style="margin-top:4px;"><input type="checkbox" id="hoUrgent"> 🚨 عاجل</label>
     <div style="display:flex;gap:8px;margin-top:10px;"><button onclick="saveHandover()">حفظ</button><button class="secondary" onclick="closeModal()">إلغاء</button></div>
   `);
+  window.saveHandover = () => {
+    const s=document.getElementById('hoS').value.trim(), b=document.getElementById('hoB').value.trim(), a=document.getElementById('hoA').value.trim(), r=document.getElementById('hoR').value.trim();
+    const urgent=document.getElementById('hoUrgent').checked;
+    const patientId=document.getElementById('hoPatient').value;
+    if(!s||!b||!a||!r) { alert('⚠️ جميع حقول SBAR مطلوبة'); return; }
+    const patient = state.patients.find(p=>p.id===patientId);
+    state.handovers.push({id:'h'+uid(), date:today(), author:getRoleLabel(state.currentRole), patientId:patientId||null, patientName:patient?patient.name:null, situation:s, background:b, assessment:a, recommendation:r, urgent, acknowledged:false, updatedAt:Date.now()});
+    addAuditLog('تسليم جديد', `تم إنشاء تسليم من ${state.currentRole}${patient?' لـ '+patient.name:''}`);
+    saveState(); closeModal(); renderContent(); showToast('📝 تم حفظ التسليم');
+  };
 }
-
-function saveHandover() {
-  const s = document.getElementById('hoS').value.trim();
-  const b = document.getElementById('hoB').value.trim();
-  const a = document.getElementById('hoA').value.trim();
-  const r = document.getElementById('hoR').value.trim();
-  const urgent = document.getElementById('hoUrgent').checked;
-  const patientId = document.getElementById('hoPatient').value;
-  if (!s || !b || !a || !r) { alert('⚠️ جميع حقول SBAR مطلوبة'); return; }
-  const patient = state.patients.find(p => p.id === patientId);
-  state.handovers.push({
-    id: 'h'+uid(), date: today(), author: getRoleLabel(state.currentRole),
-    patientId: patientId || null, patientName: patient ? patient.name : null,
-    situation: s, background: b, assessment: a, recommendation: r,
-    urgent, acknowledged: false, updatedAt: Date.now()
-  });
-  addAuditLog('تسليم جديد', `تم إنشاء تسليم من ${state.currentRole}${patient ? ' لـ ' + patient.name : ''}`);
-  saveState();
-  closeModal();
-  render();
-  showToast('📝 تم حفظ التسليم');
-}
-
 function acknowledgeHandover(id) {
-  const h = state.handovers.find(h => h.id === id);
-  if (h) { h.acknowledged = true; h.updatedAt = Date.now(); addAuditLog('استلام تسليم', `تم استلام تسليم من ${h.author}`); saveState(); render(); showToast('✅ تم استلام التسليم'); }
+  const h=state.handovers.find(handover=>handover.id===id); if(h){h.acknowledged=true; h.updatedAt=Date.now(); addAuditLog('استلام تسليم', `تم استلام تسليم من ${h.author}`); saveState(); renderContent(); showToast('✅ تم الاستلام');}
 }
 
-// ─── التقارير المتقدمة ───
 function renderReports(container) {
-  const totalPatients = state.patients.length;
-  const activePatients = state.patients.filter(p => p.status !== 'discharged').length;
-  const dischargedPatients = state.patients.filter(p => p.status === 'discharged').length;
-  const criticalPatients = state.patients.filter(p => p.patientStatus === 'critical').length;
-  const stablePatients = state.patients.filter(p => p.patientStatus === 'stable').length;
-  const monitoringPatients = state.patients.filter(p => p.patientStatus === 'monitoring').length;
-  const interventionPatients = state.patients.filter(p => p.patientStatus === 'intervention').length;
-  
-  const totalTasks = state.tasks.length;
-  const pendingTasks = state.tasks.filter(t => !t.done).length;
-  const doneTasks = state.tasks.filter(t => t.done).length;
-  
-  const tasksByRole = {};
-  state.tasks.forEach(t => {
-    if (!tasksByRole[t.assignee]) tasksByRole[t.assignee] = 0;
-    tasksByRole[t.assignee]++;
-  });
-  
-  const totalHandovers = state.handovers.length;
-  const urgentHandovers = state.handovers.filter(h => h.urgent).length;
-  const acknowledgedHandovers = state.handovers.filter(h => h.acknowledged).length;
-  
-  let html = `
-    <h2 style="font-size:18px;margin-bottom:12px;">📊 التقارير المتقدمة</h2>
-    <div class="dashboard">
-      <div class="stat-card primary"><div class="stat-number">${totalPatients}</div><div class="stat-label">🏥 إجمالي المرضى</div></div>
-      <div class="stat-card success"><div class="stat-number">${activePatients}</div><div class="stat-label">🩺 مرضى نشطون</div></div>
-      <div class="stat-card secondary"><div class="stat-number">${dischargedPatients}</div><div class="stat-label">✅ مكتمل</div></div>
-      <div class="stat-card danger"><div class="stat-number">${criticalPatients}</div><div class="stat-label">🚨 حرج</div></div>
-    </div>
+  const total=state.patients.length, active=state.patients.filter(p=>p.status!=='discharged').length, discharged=state.patients.filter(p=>p.status==='discharged').length;
+  const stageCounts = [0,0,0,0];
+  state.patients.filter(p=>p.status!=='discharged').forEach(p => { if(p.workflowStage>=1&&p.workflowStage<=4) stageCounts[p.workflowStage-1]++; });
+  const pendingTasks=state.tasks.filter(t=>!t.done).length;
+  const doneTasks=state.tasks.filter(t=>t.done).length;
+  const tasksByRole = {}; state.tasks.forEach(t=>{ if(!tasksByRole[t.assignee]) tasksByRole[t.assignee]=0; tasksByRole[t.assignee]++; });
+  let html = `<h2 style="font-size:18px;margin-bottom:12px;">📊 التقارير المتقدمة</h2>
+    <div class="dashboard"><div class="stat-card primary"><div class="stat-number">${total}</div><div class="stat-label">🏥 الإجمالي</div></div>
+    <div class="stat-card success"><div class="stat-number">${active}</div><div class="stat-label">🩺 نشطون</div></div>
+    <div class="stat-card secondary"><div class="stat-number">${discharged}</div><div class="stat-label">✅ مكتمل</div></div>
+    <div class="stat-card warning"><div class="stat-number">${pendingTasks}</div><div class="stat-label">📋 مهام معلقة</div></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div class="card" style="border-right-color:var(--primary);"><div class="title">📋 المهام</div>
-        <div>المعلقة: ${pendingTasks}</div><div>المنجزة: ${doneTasks}</div><div>الإجمالي: ${totalTasks}</div>
-      </div>
-      <div class="card" style="border-right-color:var(--secondary);"><div class="title">👥 المهام حسب الدور</div>
-        ${Object.entries(tasksByRole).map(([role, count]) => `<div>${getRoleLabel(role)}: ${count}</div>`).join('')}
-      </div>
+      <div class="card" style="border-right-color:var(--primary);"><div class="title">📋 المهام</div><div>المعلقة: ${pendingTasks}</div><div>المنجزة: ${doneTasks}</div></div>
+      <div class="card" style="border-right-color:var(--secondary);"><div class="title">👥 حسب الدور</div>${Object.entries(tasksByRole).map(([role,count])=>`<div>${getRoleLabel(role)}: ${count}</div>`).join('')}</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div class="card" style="border-right-color:var(--warning);"><div class="title">📝 التسليم</div>
-        <div>الإجمالي: ${totalHandovers}</div><div>عاجل: ${urgentHandovers}</div><div>مستلم: ${acknowledgedHandovers}</div>
-      </div>
-      <div class="card" style="border-right-color:var(--info);"><div class="title">🩺 حالة المرضى</div>
-        <div>مستقر: ${stablePatients}</div><div>مراقبة: ${monitoringPatients}</div><div>تدخل: ${interventionPatients}</div><div>حرج: ${criticalPatients}</div>
-      </div>
+    <div class="card" style="border-right-color:var(--info);"><div class="title">🔄 توزيع المرضى حسب المرحلة</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${['الاستقبال','الخطة','التنفيذ','الخروج'].map((s,i)=>`<div><span class="status-badge stage${i+1}">${s}</span> ${stageCounts[i]}</div>`).join('')}</div>
     </div>
-    <div class="card" style="border-right-color:var(--gray);">
-      <div class="title">📜 سجل التدقيق (آخر 5)</div>
-      ${state.auditLog.slice(-5).reverse().map(log => `
-        <div style="font-size:12px;border-bottom:1px solid #e2e8f0;padding:4px 0;">
-          <span class="text-muted">${new Date(log.timestamp).toLocaleString()}</span>
-          <span class="role-tag">${getRoleLabel(log.user)}</span>
-          <span>${log.action}</span>
-          <span style="color:var(--gray);">${log.details}</span>
-        </div>
-      `).join('')}
-      ${state.auditLog.length === 0 ? '<div class="text-muted">لا توجد سجلات</div>' : ''}
+    <div class="card" style="border-right-color:var(--gray);"><div class="title">📜 سجل التدقيق (آخر 5)</div>
+      ${state.auditLog.slice(-5).reverse().map(log => `<div style="font-size:12px;border-bottom:1px solid #e2e8f0;padding:4px 0;"><span class="text-muted">${new Date(log.timestamp).toLocaleString()}</span> <span class="role-tag">${getRoleLabel(log.user)}</span> <span>${log.action}</span> <span style="color:var(--gray);">${log.details}</span></div>`).join('')}
+      ${state.auditLog.length===0?'<div class="text-muted">لا توجد سجلات</div>':''}
     </div>
   `;
   container.innerHTML += html;
 }
 
-// ─── لوحة الإدارة ───
-function openAdminPanel() {
-  if (state.currentRole !== 'senior') { showToast('⚠️ هذه اللوحة للاستشاري فقط'); return; }
+// ─── 14. الإدارة ───
+function adminOpenPanel() {
+  if(state.currentRole !== 'senior') { showToast('⚠️ هذه اللوحة للاستشاري فقط'); return; }
   let html = `<h2>🔑 إدارة الفريق</h2><h3>الأعضاء الحاليون</h3>`;
   state.teamMembers.forEach(m => {
     html += `<div class="card" style="border-right-color:#8b5cf6;padding:10px;"><div class="flex-between"><span><b>${m.name}</b> <span class="role-tag">${getRoleLabel(m.role)}</span></span><span class="text-muted">${m.id}</span></div><div class="actions"><button class="small secondary" onclick="changeMemberRole('${m.id}')">🔄 تغيير الدور</button><button class="small danger" onclick="removeMember('${m.id}')">🗑️ حذف</button></div></div>`;
   });
   html += `<h3>➕ إضافة عضو جديد</h3><label>الاسم</label><input id="newMemberName" placeholder="مثال: د. فاطمة"><label>الدور</label><select id="newMemberRole" class="form-input"><option value="junior">طبيب مبتدئ</option><option value="nurse">ممرض</option><option value="admin">إداري</option></select><div style="display:flex;gap:8px;margin-top:8px;"><button onclick="addMember()">➕ إضافة</button><button class="secondary" onclick="closeModal()">إغلاق</button></div>`;
   openModal(html);
+  window.addMember = () => {
+    const name = document.getElementById('newMemberName').value.trim();
+    const role = document.getElementById('newMemberRole').value;
+    if(!name){ alert('الاسم مطلوب'); return; }
+    state.teamMembers.push({id:'u'+uid(), name, role, updatedAt:Date.now()});
+    addAuditLog('إضافة عضو', `تم إضافة ${name} بدور ${role}`);
+    saveState(); closeModal(); renderContent(); showToast(`✅ تم إضافة ${name}`);
+  };
+  window.changeMemberRole = (id) => {
+    const m=state.teamMembers.find(member=>member.id===id); if(!m) return;
+    const newRole=prompt('الدور الجديد (senior/junior/nurse/admin):', m.role);
+    if(newRole && ['senior','junior','nurse','admin'].includes(newRole)) { m.role=newRole; m.updatedAt=Date.now(); addAuditLog('تغيير دور', `تم تغيير دور ${m.name} إلى ${newRole}`); saveState(); closeModal(); renderContent(); showToast('🔄 تم التحديث'); }
+  };
+  window.removeMember = (id) => {
+    if(!confirm('حذف هذا العضو؟')) return;
+    const m=state.teamMembers.find(member=>member.id===id);
+    state.teamMembers=state.teamMembers.filter(member=>member.id!==id);
+    if(m) addAuditLog('حذف عضو', `تم حذف ${m.name}`);
+    saveState(); closeModal(); renderContent(); showToast('🗑️ تم الحذف');
+  };
 }
 
-function addMember() {
-  const name = document.getElementById('newMemberName').value.trim();
-  const role = document.getElementById('newMemberRole').value;
-  if (!name) { alert('الاسم مطلوب'); return; }
-  const id = 'u'+uid();
-  state.teamMembers.push({ id, name, role, updatedAt: Date.now() });
-  addAuditLog('إضافة عضو', `تم إضافة ${name} بدور ${role}`);
-  saveState();
-  closeModal();
-  render();
-  showToast(`✅ تم إضافة ${name}`);
-}
-
-function removeMember(id) {
-  if (!confirm('حذف هذا العضو؟')) return;
-  const m = state.teamMembers.find(m => m.id === id);
-  state.teamMembers = state.teamMembers.filter(m => m.id !== id);
-  if (m) addAuditLog('حذف عضو', `تم حذف ${m.name}`);
-  saveState();
-  closeModal();
-  render();
-  showToast('🗑️ تم حذف العضو');
-}
-
-function changeMemberRole(id) {
-  const m = state.teamMembers.find(m => m.id === id);
-  if (!m) return;
-  const newRole = prompt('الدور الجديد (senior/junior/nurse/admin):', m.role);
-  if (newRole && ['senior','junior','nurse','admin'].includes(newRole)) {
-    m.role = newRole; m.updatedAt = Date.now();
-    addAuditLog('تغيير دور', `تم تغيير دور ${m.name} إلى ${newRole}`);
-    saveState();
-    closeModal();
-    render();
-    showToast('🔄 تم تحديث الدور');
-  }
-}
-
-// ─── تصدير واستيراد ───
+// ─── 15. تصدير واستيراد ───
 window.exportData = function() {
   const data = JSON.stringify(state, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
+  const blob = new Blob([data], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1940,47 +874,89 @@ window.exportData = function() {
   URL.revokeObjectURL(url);
   showToast('📤 تم تصدير البيانات');
 };
-
 window.importData = function(event) {
   const file = event.target.files[0];
-  if (!file) return;
+  if(!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.patients) state.patients = data.patients;
-      if (data.tasks) state.tasks = data.tasks;
-      if (data.handovers) state.handovers = data.handovers;
-      if (data.clinicSlots) state.clinicSlots = data.clinicSlots;
-      if (data.teamMessages) state.teamMessages = data.teamMessages;
-      if (data.teamMembers) state.teamMembers = data.teamMembers;
-      if (data.auditLog) state.auditLog = data.auditLog;
+      if(data.patients) state.patients = data.patients;
+      if(data.tasks) state.tasks = data.tasks;
+      if(data.handovers) state.handovers = data.handovers;
+      if(data.clinicSlots) state.clinicSlots = data.clinicSlots;
+      if(data.teamMessages) state.teamMessages = data.teamMessages;
+      if(data.teamMembers) state.teamMembers = data.teamMembers;
+      if(data.auditLog) state.auditLog = data.auditLog;
       state.lastSync = Date.now();
       addAuditLog('استيراد بيانات', 'تم استيراد البيانات من ملف');
       saveState();
-      render();
-      showToast('✅ تم استيراد البيانات بنجاح');
-    } catch (err) { alert('⚠️ ملف غير صالح'); }
+      renderContent();
+      showToast('✅ تم استيراد البيانات');
+    } catch(err) { alert('⚠️ ملف غير صالح'); }
   };
   reader.readAsText(file);
   event.target.value = '';
 };
 
-// ─── إشعارات المتصفح ───
-function requestNotificationPermission() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+// ─── 16. المزامنة وإشعارات ───
+async function syncToServer() {
+  try {
+    const resp = await fetch('/api/state');
+    if(resp.ok) {
+      const serverData = await resp.json();
+      for(const key of ['patients','tasks','handovers','clinicSlots','teamMembers','teamMessages']) {
+        if(serverData[key] && serverData[key].length) {
+          const localMap = {}; state[key].forEach(item => { localMap[item.id] = item; });
+          serverData[key].forEach(serverItem => {
+            const localItem = localMap[serverItem.id];
+            if(!localItem || (serverItem.updatedAt||0) > (localItem.updatedAt||0)) {
+              state[key] = state[key].filter(i => i.id !== serverItem.id);
+              state[key].push(serverItem);
+            }
+          });
+          for(const localItem of state[key]) {
+            const serverItem = serverData[key].find(s => s.id === localItem.id);
+            if(!serverItem || (localItem.updatedAt||0) > (serverItem.updatedAt||0)) {
+              await fetch(`/api/${key}/${localItem.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(localItem) });
+            }
+          }
+        } else {
+          for(const item of state[key]) {
+            await fetch(`/api/${key}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
+          }
+        }
+      }
+      state.lastSync = Date.now();
+      state.isOffline = false;
+      document.getElementById('offlineBanner').classList.remove('visible');
+      document.getElementById('syncDot').className = 'dot online';
+      document.getElementById('syncLabel').textContent = 'متصل';
+      saveState();
+      showToast('🔄 تمت المزامنة');
+    }
+  } catch(e) {
+    state.isOffline = true;
+    document.getElementById('offlineBanner').classList.add('visible');
+    document.getElementById('syncDot').className = 'dot offline';
+    document.getElementById('syncLabel').textContent = 'محلي';
+    console.warn('⚠️ الخادم غير متاح:', e.message);
+    setTimeout(syncToServer, 30000);
   }
 }
 
+function requestNotificationPermission() {
+  if('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+}
+
 function checkTaskReminders() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
   const now = new Date();
   state.tasks.filter(t => !t.done && !t.reminded).forEach(t => {
-    if (t.dueDate && t.dueTime) {
+    if(t.dueDate && t.dueTime) {
       const dueDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
       const diffMin = (dueDateTime - now) / 60000;
-      if (diffMin > 0 && diffMin <= 30) {
+      if(diffMin > 0 && diffMin <= 30) {
         new Notification('⏰ تذكير بمهمة', {
           body: `${t.text} (مستحقة خلال ${Math.round(diffMin)} دقيقة)`,
           icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="45" fill="%231a73e8"/%3E%3Ctext x="50" y="65" font-size="40" text-anchor="middle" fill="white"%3E%2B%3C/text%3E%3C/svg%3E'
@@ -1992,31 +968,23 @@ function checkTaskReminders() {
   });
 }
 
-// ─── بدء التشغيل ───
-(async function init() {
+// ─── 17. التهيئة ───
+document.addEventListener('DOMContentLoaded', async () => {
   await loadState();
   document.getElementById('roleSelect').value = state.currentRole;
-  const adminBtn = document.getElementById('adminBtn');
-  const drawerAdminBtn = document.getElementById('drawerAdminBtn');
-  if (state.currentRole === 'senior') {
-    adminBtn.classList.add('visible');
-    drawerAdminBtn.style.display = 'flex';
-  } else {
-    adminBtn.classList.remove('visible');
-    drawerAdminBtn.style.display = 'none';
-  }
+  if(state.currentRole === 'senior') { document.getElementById('adminBtn').classList.add('visible'); document.getElementById('drawerAdminBtn').style.display = 'flex'; }
+  renderTabs();
+  renderContent();
   requestNotificationPermission();
   setTimeout(syncToServer, 1000);
   setInterval(syncToServer, 300000);
   setInterval(() => { fetch('/api/ping').catch(()=>{}); }, 60000);
   setInterval(checkTaskReminders, 60000);
-  render();
-  console.log('🏥 PaedsWard ULTIMATE جاهز!');
+  console.log('🏥 PaedsWard Workflow جاهز!');
   console.log('👤 الدور:', state.currentRole);
   console.log('👥 المرضى:', state.patients.length);
   console.log('📋 المهام:', state.tasks.length);
-  console.log('📜 سجل التدقيق:', state.auditLog.length);
-})();
+});
 </script>
 </body>
 </html>
