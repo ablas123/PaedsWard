@@ -3,6 +3,8 @@
 //  يربط جميع المكونات ويدير دورة حياة التطبيق
 // ================================================================
 
+import { getRoleLabel, getRoleEmoji, TABS, DEFAULT_USERS, hasPermission } from './core/constants.js';
+
 // ─── دوال مساعدة عامة ───
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16,15 +18,16 @@ function timeNow() {
   return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 }
 
-function getRoleLabel(role) {
-  const map = { senior: 'استشاري', junior: 'طبيب مبتدئ', nurse: 'ممرض', admin: 'إداري' };
-  return map[role] || role;
+// ─── دوال الـ Headers للصلاحيات ───
+function getHeaders() {
+  const state = stateManager.get();
+  return {
+    'Content-Type': 'application/json',
+    'X-User-Role': state.currentRole || 'junior',
+    'X-User-Name': state.currentUser?.name || 'جهاز محلي'
+  };
 }
-
-function getRoleEmoji(role) {
-  const map = { senior: '👨‍⚕️', junior: '🧑‍⚕️', nurse: '👩‍⚕️', admin: '📋' };
-  return map[role] || '👤';
-}
+window.getHeaders = getHeaders;
 
 // ─── عرض الرسائل التنبيهية (Toast) ───
 function showToast(message, type = 'info', duration = 3500) {
@@ -45,7 +48,7 @@ function showToast(message, type = 'info', duration = 3500) {
 }
 window.showToast = showToast;
 
-// ─── فتح وإغلاق النافذة المنبثقة (Modal) ───
+// ─── فتح وإغلاق النافذة المنبثقة ───
 function openModal(html) {
   const modal = document.getElementById('modal');
   const content = document.getElementById('modalContent');
@@ -66,10 +69,53 @@ function closeModalOverlay(e) {
 }
 window.closeModalOverlay = closeModalOverlay;
 
+// ─── إدارة المستخدمين (محلياً) ───
+const USERS_KEY = 'paedsward_users';
+
+function getUsers() {
+  try {
+    const data = localStorage.getItem(USERS_KEY);
+    return data ? JSON.parse(data) : DEFAULT_USERS.map(u => ({
+      ...u,
+      password: btoa(u.password) // تشفير بسيط
+    }));
+  } catch { return DEFAULT_USERS.map(u => ({ ...u, password: btoa(u.password) })); }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+// ─── معالج تسجيل الدخول ───
+function handleLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  const users = getUsers();
+  const user = users.find(u => u.email === email && atob(u.password) === password);
+  if (!user) {
+    showToast('⚠️ البريد أو كلمة المرور غير صحيحة', 'error');
+    return;
+  }
+  // تسجيل الدخول ناجح
+  const state = stateManager.get();
+  state.currentRole = user.role;
+  state.currentUser = { email: user.email, name: user.name, role: user.role };
+  stateManager.save();
+  
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('roleSelect').value = user.role;
+  
+  bus.emit('render');
+  showToast(`👋 مرحباً ${user.name}`, 'success');
+}
+window.handleLogin = handleLogin;
+
 // ─── تبديل الأدوار ───
 function switchRole(role) {
   const state = stateManager.get();
   state.currentRole = role;
+  if (state.currentUser) state.currentUser.role = role;
   stateManager.save();
   document.getElementById('roleSelect').value = role;
   bus.emit('roleChanged', role);
@@ -172,18 +218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 3. بناء شريط التبويبات (Navigation)
   const nav = document.getElementById('appNav');
   if (nav) {
-    const tabs = [
-      { id: 'dashboard', icon: '📊', label: 'الرئيسية' },
-      { id: 'ward', icon: '🏥', label: 'الجناح' },
-      { id: 'clinic', icon: '🩺', label: 'العيادة' },
-      { id: 'tasks', icon: '📋', label: 'المهام' },
-      { id: 'team', icon: '👥', label: 'الفريق' },
-      { id: 'handover', icon: '📝', label: 'التسليم' },
-      { id: 'reports', icon: '📊', label: 'التقارير' }
-    ];
     nav.innerHTML = `
       <div class="tab-bar">
-        ${tabs.map(tab => `
+        ${TABS.map(tab => `
           <div class="tab" data-tab="${tab.id}" onclick="bus.emit('switchTab', '${tab.id}')">
             <span class="tab-icon">${tab.icon}</span>
             <span>${tab.label}</span>
@@ -195,12 +232,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 4. تسجيل الأحداث العامة
-  bus.on('render', () => {
-    // يتم التعامل معه بواسطة المكونات
-  });
+  bus.on('render', () => { /* يتم التعامل معه بواسطة المكونات */ });
 
   bus.on('stateSaved', () => {
-    // تحديث حالة الاتصال
     const dot = document.getElementById('syncDot');
     const label = document.getElementById('syncLabel');
     if (dot && label) {
@@ -238,38 +272,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         el.textContent = count;
       }
     });
-    // زر الإدارة
     const adminBtn = document.getElementById('adminBtn');
     if (adminBtn) {
-      if (state.currentRole === 'senior') {
-        adminBtn.classList.add('visible');
-      } else {
-        adminBtn.classList.remove('visible');
-      }
+      adminBtn.classList.toggle('visible', state.currentRole === 'senior');
     }
   }
 
-  // 6. تهيئة المكونات (components)
-  // جميع المكونات قد تم تعريفها مسبقاً في ملفاتها الخاصة
-  // ونقوم فقط بتفعيلها عبر الأحداث
-
-  // تعيين التبويب الافتراضي
+  // 6. تهيئة المكونات وتعيين التبويب الافتراضي
   let currentTab = 'dashboard';
 
   bus.on('switchTab', (tab) => {
     if (currentTab === tab) return;
     currentTab = tab;
-    // تحديث التبويبات النشطة
     document.querySelectorAll('.tab').forEach(el => {
       el.classList.toggle('active', el.dataset.tab === tab);
     });
-    // تحديث البادجات
     updateBadges();
-    // تشغيل التصيير لكل مكون حسب تبويبه
     bus.emit('render');
   });
 
-  // تعيين التبويب النشط عند التحميل
   setTimeout(() => {
     const firstTab = document.querySelector('.tab[data-tab="dashboard"]');
     if (firstTab) firstTab.classList.add('active');
@@ -282,18 +303,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, 30000);
 
   // 8. مراقبة حالة الشبكة
-  window.addEventListener('online', () => {
-    bus.emit('networkOnline');
-  });
-
-  window.addEventListener('offline', () => {
-    bus.emit('networkOffline');
-  });
+  window.addEventListener('online', () => bus.emit('networkOnline'));
+  window.addEventListener('offline', () => bus.emit('networkOffline'));
 
   // 9. طلب إذن الإشعارات
   requestNotificationPermission();
 
-  // 10. إشعارات المهام (كل دقيقة)
+  // 10. إشعارات المهام
   setInterval(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const state = stateManager.get();
@@ -331,4 +347,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 13. التصيير الأولي
   bus.emit('render');
-}); 
+});
