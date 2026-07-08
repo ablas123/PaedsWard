@@ -1,107 +1,36 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaedsWard – النظام المتكامل لإدارة أجنحة الأطفال</title>
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#1e3a8a">
-    <link rel="icon" type="image/png" href="/img/icon-192.png">
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>🏥 PaedsWard – النظام الاحترافي</title>
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22PaedsWard%22%2C%22short_name%22%3A%22PaedsWard%22%2C%22start_url%22%3A%22.%2Findex.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f0f4f8%22%2C%22theme_color%22%3A%22%231a73e8%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%231a73e8'%2F%3E%3Ctext%20x%3D'50'%20y%3D'65'%20font-size%3D'40'%20text-anchor%3D'middle'%20fill%3D'white'%3E%2B%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
 </head>
 <body>
 
-    <header class="app-header">
-        <div class="header-main">
-            <div class="brand">
-                <span class="hospital-logo">🏥</span>
-                <h1>PaedsWard <span class="version-badge">v6.0.0</span></h1>
-            </div>
-            <div class="search-container">
-                <input type="text" id="globalSearch" placeholder="بحث شامل (مرضى، مهام، مواعيد، رسائل)...">
-                <span class="search-icon">🔍</span>
-            </div>
-            <div class="user-status-area">
-                <div id="connectionStatus" class="status-indicator online" title="حالة الاتصال بالسيرفر"></div>
-                <select id="userRoleSelector" class="role-selector">
-                    <option value="senior">استشاري / أخصائي (Senior)</option>
-                    <option value="junior">طبيب مبتدئ / مقيم (Junior)</option>
-                    <option value="nurse">تمريض (Nurse)</option>
-                    <option value="admin">مشرف النظام (Admin)</option>
-                </select>
-            </div>
-        </div>
+  <!-- وعاء الرسائل التنبيهية (Toast) -->
+  <div id="toastContainer"></div>
 
-        <div class="quick-dashboard" id="quickDashboard">
-            <div class="stat-card" data-type="total">
-                <span class="stat-label">إجمالي الأطفال</span>
-                <span class="stat-value" id="countTotal">0</span>
-            </div>
-            <div class="stat-card" data-type="critical">
-                <span class="stat-label">حالات حرجة</span>
-                <span class="stat-value" id="countCritical">0</span>
-            </div>
-            <div class="stat-card" data-type="tasks">
-                <span class="stat-label">مهام معلقة</span>
-                <span class="stat-value" id="countTasks">0</span>
-            </div>
-            <div class="stat-card" data-type="handover">
-                <span class="stat-label">تسليم عاجل</span>
-                <span class="stat-value" id="countUrgentHandover">0</span>
-            </div>
-        </div>
-    </header>
+  <div id="app">
+    <header id="appHeader"></header>
+    <main id="appContent"></main>
+    <nav id="appNav"></nav>
+  </div>
 
-    <div class="app-container">
-        <nav class="app-navigation" id="appNavigation">
-            <button class="nav-btn active" data-target="ward-view">📋 جناح الأطفال</button>
-            <button class="nav-btn" data-target="tasks-view">✅ المهام الطبية</button>
-            <button class="nav-btn" data-target="handover-view">🔄 تسليم المناوبة (SBAR)</button>
-            <button class="nav-btn" data-target="clinic-view">🗓️ العيادة الخارجية</button>
-            <button class="nav-btn" data-target="team-view">💬 محادثة الفريق</button>
-            <button class="nav-btn" data-target="reports-view">📊 التقارير والتحليل</button>
-            <button class="nav-btn" data-target="audit-view">🔍 سجل التدقيق Security</button>
-        </nav>
+  <!-- نافذة منبثقة (Modal) -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content" id="modalContent"></div>
+  </div>
 
-        <main class="app-content" id="appContent">
-            
-            <section id="ward-view" class="view-section active-view">
-                <div class="view-header">
-                    <h2>إدارة جناح الأطفال الحالي</h2>
-                    <button id="openAdmissionWizardBtn" class="action-btn-primary">➕ قبول طفل جديد (Wizard)</button>
-                </div>
-                <div class="ward-stages-container" id="wardStagesContainer">
-                    </div>
-            </section>
-
-            <section id="tasks-view" class="view-section">
-                </section>
-
-            <section id="handover-view" class="view-section">
-                </section>
-
-            <section id="clinic-view" class="view-section">
-                </section>
-
-            <section id="team-view" class="view-section">
-                </section>
-
-            <section id="reports-view" class="view-section">
-                </section>
-
-            <section id="audit-view" class="view-section">
-                </section>
-
-        </main>
-    </div>
-
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-box" id="modalBox">
-            </div>
-    </div>
-
-    <div class="toast-container" id="toastContainer"></div>
-
-    <script type="module" src="/js/app.js"></script>
+  <!-- JavaScript الأساسي -->
+  <script src="js/core/EventBus.js"></script>
+  <script src="js/core/StateManager.js"></script>
+  <script src="js/components/Dashboard.js"></script>
+  <script src="js/components/WardComponent.js"></script>
+  <script src="js/components/SbarHandover.js"></script>
+  <script src="js/components/AuditLog.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
