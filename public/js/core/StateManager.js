@@ -1,9 +1,9 @@
 // ================================================================
-//  مدير الحالة (State Manager) – مع طابور مزامنة ذكي + نظام تنبيهات
+//  مدير الحالة (State Manager) – مع طابور مزامنة ذكي + تنبيهات
 // ================================================================
 class StateManager {
   constructor() {
-    this.store = localforage.createInstance({ name: 'PaedsWard', storeName: 'state' });
+    this.store = localforage.createInstance({ name: 'CoreWard', storeName: 'state' });
     this.state = {
       patients: [],
       tasks: [],
@@ -12,11 +12,12 @@ class StateManager {
       teamMembers: [],
       teamMessages: [],
       auditLog: [],
-      currentRole: 'junior',
+      alerts: [],
+      currentRole: 'intern',
       currentUser: null,
       searchQuery: '',
       syncQueue: [],
-      _version: '7.0.0'
+      _version: '1.0.0'
     };
     this.syncInProgress = false;
     this.offlineMode = !navigator.onLine;
@@ -45,10 +46,10 @@ class StateManager {
 
   async save() {
     try {
-      this.state._version = '7.0.0';
+      this.state._version = '1.0.0';
       await this.store.setItem('state', this.state);
       bus.emit('stateSaved', this.state);
-      this._checkForAlerts(); // 🔥 NEW: فحص التنبيهات تلقائياً بعد الحفظ
+      this._checkForAlerts();
       return true;
     } catch (e) {
       console.warn('⚠️ فشل حفظ الحالة:', e);
@@ -60,6 +61,7 @@ class StateManager {
     const merged = { ...this.state, ...oldState };
     if (!merged.syncQueue) merged.syncQueue = [];
     if (!merged.auditLog) merged.auditLog = [];
+    if (!merged.alerts) merged.alerts = [];
     this.state = merged;
     this.save();
   }
@@ -68,16 +70,15 @@ class StateManager {
   set(newState) { this.state = { ...this.state, ...newState }; this.save(); }
   update(key, value) { this.state[key] = value; this.save(); }
 
-  // ─── الحصول على الـ Headers مع الصلاحيات ───
   getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'X-User-Role': this.state.currentRole || 'junior',
+      'X-User-Role': this.state.currentRole || 'intern',
       'X-User-Name': this.state.currentUser?.name || 'جهاز محلي'
     };
   }
 
-  // ─── إضافة عملية إلى طابور المزامنة ───
+  // ─── طابور المزامنة ───
   addToQueue(collection, method, data, entityId) {
     const op = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
@@ -93,7 +94,6 @@ class StateManager {
     if (navigator.onLine) this.processSyncQueue();
   }
 
-  // ─── تحديث المعرفات في جميع الحقول (للمزامنة) ───
   _updateAllEntityIds(obj, oldId, newId) {
     if (!obj || typeof obj !== 'object') return;
     for (const key of Object.keys(obj)) {
@@ -107,7 +107,6 @@ class StateManager {
     }
   }
 
-  // ─── معالجة طابور المزامنة (مع دعم tempId → realId) ───
   async processSyncQueue() {
     if (this.syncInProgress || !navigator.onLine) return;
     if (this.state.syncQueue.length === 0) return;
@@ -129,7 +128,6 @@ class StateManager {
         let currentId = firstOp.entityId;
         const headers = this.getHeaders();
 
-        // 🔥 POST أولاً للحصول على المعرف الحقيقي
         if (firstOp.method === 'POST') {
           try {
             const url = `/api/${firstOp.collection}`;
@@ -138,15 +136,11 @@ class StateManager {
               headers: headers,
               body: JSON.stringify(firstOp.data)
             });
-            if (!response.ok) {
-              const errText = await response.text();
-              throw new Error(`POST failed: ${response.status} ${errText}`);
-            }
+            if (!response.ok) throw new Error(`POST failed: ${response.status}`);
             const result = await response.json();
             const realId = result.item?.id || result.id || result._id;
 
             if (realId && realId !== currentId) {
-              // 🔥 تحديث جميع العمليات اللاحقة لهذا الكيان
               for (let i = 1; i < operations.length; i++) {
                 const op = operations[i];
                 if (op.entityId === currentId) {
@@ -154,12 +148,10 @@ class StateManager {
                   if (op.data) this._updateAllEntityIds(op.data, currentId, realId);
                 }
               }
-              // 🔥 تحديث البيانات المحلية (patients, tasks, etc.)
               const localData = this.state[firstOp.collection] || [];
               const item = localData.find(item => item.id === currentId);
               if (item) {
                 item.id = realId;
-                // تحديث المراجع الأخرى (مثل patientId في المهام)
                 for (const [coll, items] of Object.entries(this.state)) {
                   if (Array.isArray(items)) {
                     for (const ref of items) {
@@ -178,7 +170,6 @@ class StateManager {
           }
         }
 
-        // 🔥 تنفيذ العمليات المتبقية (PATCH, DELETE, إلخ)
         for (const op of operations) {
           if (op.method === 'POST') continue;
           try {
@@ -191,17 +182,13 @@ class StateManager {
               options.body = JSON.stringify(op.data);
             }
             const response = await fetch(url, options);
-            if (!response.ok) {
-              const errText = await response.text();
-              throw new Error(`${op.method} failed: ${response.status} ${errText}`);
-            }
+            if (!response.ok) throw new Error(`${op.method} failed: ${response.status}`);
           } catch (e) {
             console.error(`Sync ${op.method} failed:`, e);
             continue;
           }
         }
 
-        // 🔥 إزالة العمليات الناجحة من الطابور
         this.state.syncQueue = this.state.syncQueue.filter(op => {
           const k = `${op.collection}:${op.entityId}`;
           return k !== key;
@@ -218,13 +205,13 @@ class StateManager {
     }
   }
 
-  // ─── 🔥 نظام التنبيهات الذكية ───
+  // ─── نظام التنبيهات الذكية ───
   _checkForAlerts() {
     const state = this.state;
     const now = new Date();
     const alerts = [];
 
-    // 1. المهام المتأخرة أو المستحقة قريباً
+    // 1. المهام المتأخرة
     state.tasks.filter(t => !t.done).forEach(t => {
       if (t.dueDate && t.dueTime) {
         const dueDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
@@ -233,7 +220,7 @@ class StateManager {
           alerts.push({
             type: 'danger',
             title: '⏰ مهمة متأخرة',
-            message: `${t.text} (كانت مستحقة منذ ${Math.abs(Math.round(diffMin))} دقيقة)`,
+            message: `${t.text} (مستحقة منذ ${Math.abs(Math.round(diffMin))} دقيقة)`,
             taskId: t.id
           });
         } else if (diffMin <= 30) {
@@ -247,7 +234,7 @@ class StateManager {
       }
     });
 
-    // 2. المرضى في حالة حرجة
+    // 2. المرضى بحالة حرجة
     state.patients.filter(p => p.patientStatus === 'critical' && p.status !== 'discharged').forEach(p => {
       alerts.push({
         type: 'danger',
@@ -267,26 +254,54 @@ class StateManager {
       });
     });
 
-    // إرسال التنبيهات
+    // 4. تنبيهات داخلية (من General إلى Intern)
+    state.alerts.filter(a => !a.read).forEach(a => {
+      // تحقق من الصلاحية: إذا كان المستخدم الحالي Intern، يرى تنبيهات مرضاه فقط
+      if (this.state.currentRole === 'intern' && a.targetIntern && a.targetIntern !== this.state.currentUser?.email) {
+        return;
+      }
+      alerts.push({
+        type: 'info',
+        title: `📌 ${a.title}`,
+        message: a.message,
+        alertId: a.id
+      });
+    });
+
     if (alerts.length > 0) {
       bus.emit('alerts', alerts);
-      // حفظ التنبيهات في الحالة لتجنب التكرار
       this.notifications = alerts;
     } else {
       this.notifications = [];
     }
   }
 
-  // ─── دوال إدارة المستخدمين (للتسجيل) ───
+  // ─── إضافة تنبيه داخلي ───
+  addAlert(title, message, targetRole = null, targetIntern = null) {
+    this.state.alerts.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+      title,
+      message,
+      targetRole,
+      targetIntern,
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+    this.save();
+    bus.emit('alertAdded', { title, message });
+    this._checkForAlerts();
+  }
+
+  // ─── إدارة المستخدمين ───
   getUsers() {
     try {
-      const data = localStorage.getItem('paedsward_users');
+      const data = localStorage.getItem('coreward_users');
       return data ? JSON.parse(data) : [];
     } catch { return []; }
   }
 
   saveUsers(users) {
-    localStorage.setItem('paedsward_users', JSON.stringify(users));
+    localStorage.setItem('coreward_users', JSON.stringify(users));
   }
 
   registerUser(name, email, password, role) {
@@ -297,8 +312,8 @@ class StateManager {
     const newUser = {
       name,
       email,
-      password: btoa(password), // تشفير بسيط
-      role: role || 'junior',
+      password: btoa(password),
+      role: role || 'intern',
       active: true
     };
     users.push(newUser);
@@ -321,7 +336,7 @@ class StateManager {
     this.offlineMode = false;
     bus.emit('networkOnline');
     this.processSyncQueue();
-    this._checkForAlerts(); // 🔥 تحديث التنبيهات عند عودة الاتصال
+    this._checkForAlerts();
   }
 
   _handleOffline() {
