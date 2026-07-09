@@ -1,5 +1,5 @@
 // ================================================================
-//  app.js – نقطة الانطلاق الرئيسية (Entry Point)
+//  app.js – نقطة الانطلاق الرئيسية (مع مصادقة حقيقية)
 // ================================================================
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -50,14 +50,22 @@ function closeModalOverlay(e) {
 }
 window.closeModalOverlay = closeModalOverlay;
 
-function handleLogin() {
+// ─── معالج تسجيل الدخول ───
+async function handleLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
   try {
-    const user = stateManager.loginUser(email, password);
+    const user = await stateManager.loginUser(email, password);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     document.getElementById('roleSelect').value = user.role;
+    // تحديث زر الإدارة إذا كان المدير
+    const adminBtn = document.getElementById('adminBtn');
+    if (user.role === 'director') {
+      adminBtn.classList.add('visible');
+    } else {
+      adminBtn.classList.remove('visible');
+    }
     bus.emit('render');
     showToast(`👋 مرحباً ${user.name}`, 'success');
   } catch (e) {
@@ -66,49 +74,60 @@ function handleLogin() {
 }
 window.handleLogin = handleLogin;
 
-function showRegisterForm() {
+// ─── لوحة إدارة المستخدمين (للمدير فقط) ───
+function openUserManagement() {
+  const state = stateManager.get();
+  if (state.currentRole !== 'director') {
+    showToast('⚠️ هذه اللوحة للمدير فقط', 'error');
+    return;
+  }
   openModal(`
-    <h2>📝 إنشاء حساب جديد</h2>
-    <label>الاسم الكامل *</label>
-    <input id="regName" placeholder="مثال: د. أحمد">
-    <label>البريد الإلكتروني *</label>
-    <input id="regEmail" type="email" placeholder="example@ward.com">
-    <label>كلمة المرور *</label>
-    <input id="regPassword" type="password" placeholder="••••••••">
+    <h2>👑 إدارة المستخدمين</h2>
+    <h3>إنشاء حساب جديد</h3>
+    <label>الاسم الكامل *</label><input id="newUserName" placeholder="مثال: د. خالد">
+    <label>البريد الإلكتروني *</label><input id="newUserEmail" type="email" placeholder="example@ward.com">
+    <label>كلمة المرور *</label><input id="newUserPassword" type="password" placeholder="••••••••">
     <label>الدور</label>
-    <select id="regRole" class="form-input">
+    <select id="newUserRole" class="form-input">
       <option value="director">مدير</option>
       <option value="specialist">اختصاصي</option>
       <option value="deputy">نائب</option>
       <option value="general">عمومي</option>
       <option value="intern" selected>طبيب امتياز</option>
     </select>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button onclick="handleRegister()" class="success" style="flex:1;">✅ تسجيل</button>
-      <button onclick="closeModal()" class="secondary">إلغاء</button>
+    <button onclick="createUser()" class="block success" style="margin-top:8px;">✅ إنشاء حساب</button>
+    <hr>
+    <h3>المستخدمون الحاليون</h3>
+    <div id="userList">
+      ${state.teamMembers.map(m => `<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #e2e8f0;">${m.name} (${getRoleLabel(m.role)}) - ${m.email}</div>`).join('')}
     </div>
+    <button class="secondary block" style="margin-top:12px;" onclick="closeModal()">إغلاق</button>
   `);
 }
-window.showRegisterForm = showRegisterForm;
+window.openUserManagement = openUserManagement;
 
-function handleRegister() {
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const password = document.getElementById('regPassword').value.trim();
-  const role = document.getElementById('regRole').value;
+async function createUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const password = document.getElementById('newUserPassword').value.trim();
+  const role = document.getElementById('newUserRole').value;
   if (!name || !email || !password || password.length < 4) {
     showToast('⚠️ جميع الحقول مطلوبة وكلمة المرور 4 أحرف على الأقل', 'error');
     return;
   }
   try {
-    const newUser = stateManager.registerUser(name, email, password, role);
+    await stateManager.createUser(name, email, password, role);
     closeModal();
-    showToast(`✅ تم إنشاء حساب ${newUser.name} بنجاح!`, 'success');
+    showToast(`✅ تم إنشاء حساب ${name}`, 'success');
+    // إعادة فتح اللوحة لتحديث القائمة
+    setTimeout(openUserManagement, 500);
   } catch (e) {
     showToast(`⚠️ ${e.message}`, 'error');
   }
 }
-window.handleRegister = handleRegister;
+
+// ─── باقي الدوال (switchRole, searchGlobal, exportData, importData, إلخ) ───
+// ... (كما هي في النسخة السابقة، لكن نضيف استدعاء syncToServer بعد التغييرات)
 
 function switchRole(role) {
   const state = stateManager.get();
@@ -160,7 +179,7 @@ function importData(event) {
       if (data.auditLog) state.auditLog = data.auditLog;
       if (data.alerts) state.alerts = data.alerts;
       if (data.syncQueue) state.syncQueue = data.syncQueue;
-      state._version = '1.0.0';
+      state._version = '2.0.0';
       await stateManager.save();
       bus.emit('render');
       showToast('✅ تم استيراد البيانات بنجاح', 'success');
@@ -179,23 +198,41 @@ function requestNotificationPermission() {
   }
 }
 
+// ─── تحديث حالة الاتصال ───
+function updateSyncStatus(online) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  if (dot && label) {
+    if (online) {
+      dot.className = 'dot online';
+      label.textContent = 'متصل';
+    } else {
+      dot.className = 'dot offline';
+      label.textContent = 'محلي';
+    }
+  }
+}
+window.updateSyncStatus = updateSyncStatus;
+
+// ─── تهيئة التطبيق ───
 document.addEventListener('DOMContentLoaded', async () => {
   await stateManager.load();
   const state = stateManager.get();
 
+  // بناء الهيكل
   const header = document.getElementById('appHeader');
   if (header) {
     header.innerHTML = `
       <div class="brand" onclick="bus.emit('switchTab', 'dashboard')">🏥 CoreWard <small>· ذكي</small></div>
       <div class="header-actions">
         <select id="roleSelect" onchange="switchRole(this.value)">
-          <option value="director">👨‍⚕️ مدير</option>
+          <option value="director">👑 مدير</option>
           <option value="specialist">🩺 اختصاصي</option>
           <option value="deputy">👨‍⚕️ نائب</option>
           <option value="general">🧑‍⚕️ عمومي</option>
           <option value="intern">👨‍🎓 طبيب امتياز</option>
         </select>
-        <button id="adminBtn" onclick="bus.emit('openAdmin')">🔑</button>
+        <button id="adminBtn" onclick="openUserManagement()" class="${state.currentRole === 'director' ? 'visible' : ''}">👑</button>
         <button onclick="exportData()" title="تصدير">📤</button>
         <button onclick="document.getElementById('importFile').click()" title="استيراد">📥</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
@@ -223,38 +260,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
+  // الأحداث
   bus.on('render', () => {});
-  bus.on('stateSaved', () => {
-    const dot = document.getElementById('syncDot');
-    const label = document.getElementById('syncLabel');
-    if (dot && label) {
-      if (navigator.onLine) {
-        dot.className = 'dot online';
-        label.textContent = 'متصل';
-      } else {
-        dot.className = 'dot offline';
-        label.textContent = 'محلي';
-      }
-    }
-    updateBadges();
-  });
+  bus.on('stateSaved', () => { updateSyncStatus(navigator.onLine); });
 
   bus.on('networkOnline', () => {
     showToast('🔄 عاد الاتصال بالإنترنت، جاري المزامنة...', 'success');
     stateManager.processSyncQueue();
+    stateManager.syncToServer();
   });
 
   bus.on('networkOffline', () => {
     showToast('⚠️ انقطع الاتصال بالإنترنت، سيتم حفظ البيانات محلياً', 'warning');
   });
 
-  bus.on('alerts', (alerts) => {
-    alerts.forEach(alert => {
-      const type = alert.type === 'danger' ? 'error' : 'warning';
-      showToast(`🚨 ${alert.title}: ${alert.message}`, type, 5000);
-    });
-  });
-
+  // تحديث الشارات
   function updateBadges() {
     const state = stateManager.get();
     const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'director')).length;
@@ -268,10 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         el.textContent = count;
       }
     });
-    const adminBtn = document.getElementById('adminBtn');
-    if (adminBtn) {
-      adminBtn.classList.toggle('visible', state.currentRole === 'director');
-    }
   }
 
   let currentTab = 'dashboard';
@@ -291,8 +307,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     bus.emit('switchTab', 'dashboard');
   }, 100);
 
+  // مزامنة دورية
   setInterval(() => {
-    if (navigator.onLine) stateManager.processSyncQueue();
+    if (navigator.onLine) {
+      stateManager.processSyncQueue();
+      stateManager.syncToServer();
+    }
   }, 30000);
 
   window.addEventListener('online', () => bus.emit('networkOnline'));
@@ -300,32 +320,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   requestNotificationPermission();
 
-  setInterval(() => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const state = stateManager.get();
-    const now = new Date();
-    state.tasks.filter(t => !t.done && !t.reminded).forEach(t => {
-      if (t.dueDate && t.dueTime) {
-        const dueDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
-        const diffMin = (dueDateTime - now) / 60000;
-        if (diffMin > 0 && diffMin <= 30) {
-          new Notification('⏰ تذكير بمهمة', {
-            body: `${t.text} (مستحقة خلال ${Math.round(diffMin)} دقيقة)`,
-            icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="45" fill="%231a73e8"/%3E%3Ctext x="50" y="65" font-size="40" text-anchor="middle" fill="white"%3E%2B%3C/text%3E%3C/svg%3E'
-          });
-          t.reminded = true;
-          stateManager.save();
-        }
-      }
-    });
-  }, 60000);
-
-  console.log('🚀 CoreWard جاهز!');
+  console.log('🚀 CoreWard PRO جاهز!');
   console.log('👤 الدور:', state.currentRole);
   console.log('📦 الإصدار:', state._version);
-  console.log('👥 المرضى:', state.patients.length);
-  console.log('📋 المهام:', state.tasks.length);
-
   if (state.syncQueue && state.syncQueue.length > 0) {
     showToast(`🔄 يوجد ${state.syncQueue.length} عملية في طابور المزامنة`, 'warning', 5000);
     if (navigator.onLine) {
@@ -333,6 +330,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  stateManager._checkForAlerts();
   bus.emit('render');
 });
