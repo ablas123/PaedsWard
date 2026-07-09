@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,6 +15,7 @@ const DB_FILE = path.join(__dirname, 'database.json');
 let db = null;
 let dbLock = false;
 
+// ─── تحميل وحفظ قاعدة البيانات ───
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
@@ -26,20 +28,19 @@ function loadDatabase() {
         clinicSlots: [],
         teamMessages: [],
         teamMembers: [
-          { id: 'u1', name: 'د. أحمد', role: 'director' },
-          { id: 'u2', name: 'د. سارة', role: 'specialist' },
-          { id: 'u3', name: 'د. خالد', role: 'deputy' },
-          { id: 'u4', name: 'م. ليلى', role: 'general' },
-          { id: 'u5', name: 'م. نور', role: 'intern' }
+          { id: 'u1', name: 'المدير', role: 'director', email: 'admin@ward.com', password: bcrypt.hashSync('admin123', 10) }
+        ],
+        users: [
+          { id: 'u1', name: 'المدير', role: 'director', email: 'admin@ward.com', password: bcrypt.hashSync('admin123', 10) }
         ],
         auditLog: [],
-        _version: '1.0.0'
+        _version: '2.0.0'
       };
       saveDatabase();
     }
   } catch (e) {
     console.error('❌ فشل تحميل قاعدة البيانات:', e);
-    db = { patients: [], tasks: [], handovers: [], clinicSlots: [], teamMessages: [], teamMembers: [], auditLog: [] };
+    db = { patients: [], tasks: [], handovers: [], clinicSlots: [], teamMessages: [], teamMembers: [], users: [], auditLog: [] };
   }
 }
 
@@ -55,11 +56,9 @@ function saveDatabase() {
   }
 }
 
-// ============================================================
-//  RBAC – الأدوار والصلاحيات (متوافق مع العميل)
-// ============================================================
+// ─── RBAC ───
 const ROLES = {
-  director: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover', 'manage_alerts'],
+  director: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover', 'manage_alerts', 'manage_users'],
   specialist: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
   deputy: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
   general: ['admit', 'write_notes', 'view_patients', 'create_handover', 'add_alert'],
@@ -97,11 +96,54 @@ function addAuditLog(action, details, req) {
 //  نقاط النهاية (API)
 // ============================================================
 
+// ─── الحالة الكاملة ───
 app.get('/api/state', (req, res) => {
   loadDatabase();
   res.json(db);
 });
 
+// ─── تسجيل الدخول ───
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body;
+  loadDatabase();
+  const user = db.users.find(u => u.email === email);
+  if (!user) {
+    return res.status(401).json({ error: 'البريد الإلكتروني غير موجود' });
+  }
+  const valid = bcrypt.compareSync(password, user.password);
+  if (!valid) {
+    return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+  }
+  res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+});
+
+// ─── إنشاء مستخدم جديد (للمدير فقط) ───
+app.post('/api/users', (req, res) => {
+  const { name, email, password, role } = req.body;
+  const roleHeader = getRoleFromHeaders(req);
+  if (!hasPermission(roleHeader, 'manage_users')) {
+    return res.status(403).json({ error: 'غير مصرح لك بإنشاء مستخدمين' });
+  }
+  loadDatabase();
+  if (db.users.find(u => u.email === email)) {
+    return res.status(400).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
+  }
+  const newUser = {
+    id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+    name,
+    email,
+    password: bcrypt.hashSync(password, 10),
+    role: role || 'intern'
+  };
+  db.users.push(newUser);
+  // إضافة إلى teamMembers أيضاً للتوافق
+  db.teamMembers.push({ id: newUser.id, name: newUser.name, role: newUser.role, email: newUser.email });
+  saveDatabase();
+  addAuditLog('إنشاء مستخدم', `تم إنشاء حساب ${name} بدور ${role}`, req);
+  res.status(201).json({ success: true, user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role } });
+});
+
+// ─── إضافة عنصر جديد ───
 app.post('/api/:collection', (req, res) => {
   const { collection } = req.params;
   const newItem = req.body;
@@ -130,6 +172,7 @@ app.post('/api/:collection', (req, res) => {
   res.status(201).json({ success: true, item: newItem });
 });
 
+// ─── تحديث عنصر ───
 app.patch('/api/:collection/:id', (req, res) => {
   const { collection, id } = req.params;
   const updates = req.body;
@@ -152,6 +195,7 @@ app.patch('/api/:collection/:id', (req, res) => {
   res.json({ success: true, item });
 });
 
+// ─── حذف عنصر ───
 app.delete('/api/:collection/:id', (req, res) => {
   const { collection, id } = req.params;
   const role = getRoleFromHeaders(req);
@@ -176,13 +220,12 @@ app.delete('/api/:collection/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Ping ───
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'awake', time: new Date().toISOString() });
 });
 
-// ============================================================
-//  نسخ احتياطي تلقائي كل 6 ساعات
-// ============================================================
+// ─── نسخ احتياطي ───
 const BACKUP_DIR = path.join(__dirname, 'backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
 
@@ -201,7 +244,7 @@ setInterval(() => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   loadDatabase();
-  console.log(`🚀 CoreWard running on port ${PORT}`);
+  console.log(`🚀 CoreWard PRO running on port ${PORT}`);
   console.log(`📂 Database: ${DB_FILE}`);
   console.log(`📂 Backups: ${BACKUP_DIR}`);
 });
