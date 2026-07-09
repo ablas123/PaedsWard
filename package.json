@@ -1,7 +1,7 @@
 {
-  "name": "paedsward-pro",
-  "version": "7.0.0",
-  "description": "نظام إدارة أجنحة الأطفال – بنية احترافية Offline-First",
+  "name": "coreward-pro",
+  "version": "1.0.0",
+  "description": "CoreWard – النواة الذكية لإدارة جناح الأطفال",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
