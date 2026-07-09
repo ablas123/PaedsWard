@@ -1,46 +1,59 @@
 // ================================================================
 //  constants.js – الثوابت العامة (ROLES, Permissions, Helpers)
-//  جميع التعديلات المستقبلية للصلاحيات تكون هنا فقط
 // ================================================================
 
-// ─── تعريف الأدوار والصلاحيات (RBAC) ───
-export const ROLES = {
-  senior: [
+const ROLES = {
+  director: [
     'view_all', 'manage_team', 'discharge', 'approve_plan',
     'view_reports', 'create_task', 'view_patients', 'admit',
-    'write_notes', 'update_vitals', 'create_handover'
+    'write_notes', 'update_vitals', 'create_handover', 'manage_alerts'
   ],
-  junior: [
-    'admit', 'write_notes', 'complete_tasks', 'create_handover',
-    'view_patients', 'update_vitals'
+  specialist: [
+    'view_all', 'discharge', 'approve_plan', 'view_reports',
+    'create_task', 'view_patients', 'admit', 'write_notes',
+    'update_vitals', 'create_handover'
   ],
-  nurse: [
-    'update_vitals', 'view_patients', 'complete_tasks'
+  deputy: [
+    'view_all', 'discharge', 'approve_plan', 'view_reports',
+    'create_task', 'view_patients', 'admit', 'write_notes',
+    'update_vitals', 'create_handover'
   ],
-  admin: [
-    'manage_clinic', 'view_patients', 'send_alerts'
+  general: [
+    'admit', 'write_notes', 'view_patients', 'create_handover', 'add_alert'
+  ],
+  intern: [
+    'admit', 'write_notes', 'view_patients', 'complete_tasks'
   ]
 };
 
-// ─── دوال مساعدة للصلاحيات ───
-export function hasPermission(role, permission) {
+function hasPermission(role, permission) {
   if (!role || !permission) return false;
   return ROLES[role]?.includes(permission) || false;
 }
 
-// ─── دوال مساعدة عامة ───
-export function getRoleLabel(role) {
-  const map = { senior: 'استشاري', junior: 'طبيب مبتدئ', nurse: 'ممرض', admin: 'إداري' };
+function getRoleLabel(role) {
+  const map = {
+    director: 'مدير',
+    specialist: 'اختصاصي',
+    deputy: 'نائب',
+    general: 'عمومي',
+    intern: 'طبيب امتياز'
+  };
   return map[role] || role;
 }
 
-export function getRoleEmoji(role) {
-  const map = { senior: '👨‍⚕️', junior: '🧑‍⚕️', nurse: '👩‍⚕️', admin: '📋' };
+function getRoleEmoji(role) {
+  const map = {
+    director: '👨‍⚕️',
+    specialist: '🩺',
+    deputy: '👨‍⚕️',
+    general: '🧑‍⚕️',
+    intern: '👨‍🎓'
+  };
   return map[role] || '👤';
 }
 
-// ─── قائمة التبويبات (للاستخدام في Navigation) ───
-export const TABS = [
+const TABS = [
   { id: 'dashboard', icon: '📊', label: 'الرئيسية' },
   { id: 'ward', icon: '🏥', label: 'الجناح' },
   { id: 'clinic', icon: '🩺', label: 'العيادة' },
@@ -50,9 +63,15 @@ export const TABS = [
   { id: 'reports', icon: '📊', label: 'التقارير' }
 ];
 
-// ─── المستخدمون الافتراضيون (لتسجيل الدخول) ───
-export const DEFAULT_USERS = [
-  { email: 'admin@ward.com', password: 'admin123', role: 'senior', name: 'د. المدير' },
-  { email: 'doctor@ward.com', password: 'doctor123', role: 'junior', name: 'د. مبتدئ' },
-  { email: 'nurse@ward.com', password: 'nurse123', role: 'nurse', name: 'م. تمريض' }
+const DEFAULT_USERS = [
+  { email: 'admin@ward.com', password: 'admin123', role: 'director', name: 'د. المدير' },
+  { email: 'specialist@ward.com', password: 'specialist123', role: 'specialist', name: 'د. الاختصاصي' },
+  { email: 'intern@ward.com', password: 'intern123', role: 'intern', name: 'ط. الامتياز' }
 ];
+
+window.ROLES = ROLES;
+window.hasPermission = hasPermission;
+window.getRoleLabel = getRoleLabel;
+window.getRoleEmoji = getRoleEmoji;
+window.TABS = TABS;
+window.DEFAULT_USERS = DEFAULT_USERS;
