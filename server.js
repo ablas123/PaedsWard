@@ -14,9 +14,6 @@ const DB_FILE = path.join(__dirname, 'database.json');
 let db = null;
 let dbLock = false;
 
-// ============================================================
-//  إدارة قاعدة البيانات (JSON) مع قفل ذكي
-// ============================================================
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
@@ -29,12 +26,14 @@ function loadDatabase() {
         clinicSlots: [],
         teamMessages: [],
         teamMembers: [
-          { id: 'u1', name: 'د. أحمد', role: 'senior' },
-          { id: 'u2', name: 'د. سارة', role: 'junior' },
-          { id: 'u3', name: 'م. ليلى', role: 'nurse' }
+          { id: 'u1', name: 'د. أحمد', role: 'director' },
+          { id: 'u2', name: 'د. سارة', role: 'specialist' },
+          { id: 'u3', name: 'د. خالد', role: 'deputy' },
+          { id: 'u4', name: 'م. ليلى', role: 'general' },
+          { id: 'u5', name: 'م. نور', role: 'intern' }
         ],
         auditLog: [],
-        _version: '7.0.0'
+        _version: '1.0.0'
       };
       saveDatabase();
     }
@@ -57,13 +56,14 @@ function saveDatabase() {
 }
 
 // ============================================================
-//  نظام الصلاحيات (RBAC) – متوافق مع العميل
+//  RBAC – الأدوار والصلاحيات (متوافق مع العميل)
 // ============================================================
 const ROLES = {
-  senior: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
-  junior: ['admit', 'write_notes', 'complete_tasks', 'create_handover', 'view_patients', 'update_vitals'],
-  nurse: ['update_vitals', 'view_patients', 'complete_tasks'],
-  admin: ['manage_clinic', 'view_patients', 'send_alerts']
+  director: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover', 'manage_alerts'],
+  specialist: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
+  deputy: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
+  general: ['admit', 'write_notes', 'view_patients', 'create_handover', 'add_alert'],
+  intern: ['admit', 'write_notes', 'view_patients', 'complete_tasks']
 };
 
 function hasPermission(role, permission) {
@@ -71,16 +71,13 @@ function hasPermission(role, permission) {
 }
 
 function getRoleFromHeaders(req) {
-  return req.headers['x-user-role'] || 'junior';
+  return req.headers['x-user-role'] || 'intern';
 }
 
 function getUserName(req) {
   return req.headers['x-user-name'] || 'مستخدم مجهول';
 }
 
-// ============================================================
-//  سجل التدقيق الأمني (Audit Log)
-// ============================================================
 function addAuditLog(action, details, req) {
   const role = getRoleFromHeaders(req);
   const name = getUserName(req);
@@ -110,7 +107,6 @@ app.post('/api/:collection', (req, res) => {
   const newItem = req.body;
   const role = getRoleFromHeaders(req);
 
-  // التحقق من الصلاحيات
   const permMap = {
     patients: 'admit',
     tasks: 'create_task',
@@ -139,7 +135,6 @@ app.patch('/api/:collection/:id', (req, res) => {
   const updates = req.body;
   const role = getRoleFromHeaders(req);
 
-  // التحقق من الصلاحيات
   if (collection === 'patients' && !hasPermission(role, 'view_patients')) {
     return res.status(403).json({ error: 'غير مصرح لك بتحديث بيانات المرضى' });
   }
@@ -161,7 +156,6 @@ app.delete('/api/:collection/:id', (req, res) => {
   const { collection, id } = req.params;
   const role = getRoleFromHeaders(req);
 
-  // التحقق من الصلاحيات
   if (collection === 'patients' && !hasPermission(role, 'discharge')) {
     return res.status(403).json({ error: 'غير مصرح لك بحذف مرضى' });
   }
@@ -207,7 +201,7 @@ setInterval(() => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   loadDatabase();
-  console.log(`🚀 PaedsWard PRO running on port ${PORT}`);
+  console.log(`🚀 CoreWard running on port ${PORT}`);
   console.log(`📂 Database: ${DB_FILE}`);
   console.log(`📂 Backups: ${BACKUP_DIR}`);
 });
