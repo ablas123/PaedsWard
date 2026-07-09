@@ -1,24 +1,16 @@
 // ================================================================
 //  app.js – نقطة الانطلاق الرئيسية (Entry Point)
-//  يربط جميع المكونات ويدير دورة حياة التطبيق
+//  مع واجهة تسجيل دخول محسنة ونظام تنبيهات
 // ================================================================
 
 import { getRoleLabel, getRoleEmoji, TABS, DEFAULT_USERS, hasPermission } from './core/constants.js';
 
-// ─── دوال مساعدة عامة ───
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
+// ─── دوال مساعدة ───
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function timeNow() { return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); }
 
-function today() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function timeNow() {
-  return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-}
-
-// ─── دوال الـ Headers للصلاحيات ───
+// ─── دوال الـ Headers ───
 function getHeaders() {
   const state = stateManager.get();
   return {
@@ -69,47 +61,68 @@ function closeModalOverlay(e) {
 }
 window.closeModalOverlay = closeModalOverlay;
 
-// ─── إدارة المستخدمين (محلياً) ───
-const USERS_KEY = 'paedsward_users';
-
-function getUsers() {
-  try {
-    const data = localStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : DEFAULT_USERS.map(u => ({
-      ...u,
-      password: btoa(u.password) // تشفير بسيط
-    }));
-  } catch { return DEFAULT_USERS.map(u => ({ ...u, password: btoa(u.password) })); }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-// ─── معالج تسجيل الدخول ───
+// ─── معالج تسجيل الدخول (محسّن) ───
 function handleLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
-  const users = getUsers();
-  const user = users.find(u => u.email === email && atob(u.password) === password);
-  if (!user) {
-    showToast('⚠️ البريد أو كلمة المرور غير صحيحة', 'error');
-    return;
+  try {
+    const user = stateManager.loginUser(email, password);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('roleSelect').value = user.role;
+    bus.emit('render');
+    showToast(`👋 مرحباً ${user.name}`, 'success');
+  } catch (e) {
+    showToast(`⚠️ ${e.message}`, 'error');
   }
-  // تسجيل الدخول ناجح
-  const state = stateManager.get();
-  state.currentRole = user.role;
-  state.currentUser = { email: user.email, name: user.name, role: user.role };
-  stateManager.save();
-  
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('roleSelect').value = user.role;
-  
-  bus.emit('render');
-  showToast(`👋 مرحباً ${user.name}`, 'success');
 }
 window.handleLogin = handleLogin;
+
+// ─── معالج التسجيل (مستخدم جديد) ───
+function showRegisterForm() {
+  openModal(`
+    <h2>📝 إنشاء حساب جديد</h2>
+    <label>الاسم الكامل *</label>
+    <input id="regName" placeholder="مثال: د. أحمد">
+    <label>البريد الإلكتروني *</label>
+    <input id="regEmail" type="email" placeholder="example@ward.com">
+    <label>كلمة المرور *</label>
+    <input id="regPassword" type="password" placeholder="••••••••">
+    <label>الدور</label>
+    <select id="regRole" class="form-input">
+      <option value="senior">استشاري</option>
+      <option value="junior" selected>طبيب مبتدئ</option>
+      <option value="nurse">ممرض</option>
+      <option value="admin">إداري</option>
+    </select>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="handleRegister()" class="success" style="flex:1;">✅ تسجيل</button>
+      <button onclick="closeModal()" class="secondary">إلغاء</button>
+    </div>
+  `);
+}
+window.showRegisterForm = showRegisterForm;
+
+function handleRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  const role = document.getElementById('regRole').value;
+
+  if (!name || !email || !password || password.length < 4) {
+    showToast('⚠️ جميع الحقول مطلوبة وكلمة المرور 4 أحرف على الأقل', 'error');
+    return;
+  }
+
+  try {
+    const newUser = stateManager.registerUser(name, email, password, role);
+    closeModal();
+    showToast(`✅ تم إنشاء حساب ${newUser.name} بنجاح! يمكنك تسجيل الدخول الآن.`, 'success');
+  } catch (e) {
+    showToast(`⚠️ ${e.message}`, 'error');
+  }
+}
+window.handleRegister = handleRegister;
 
 // ─── تبديل الأدوار ───
 function switchRole(role) {
@@ -186,11 +199,10 @@ function requestNotificationPermission() {
 
 // ─── تهيئة التطبيق ───
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. تحميل الحالة
   await stateManager.load();
   const state = stateManager.get();
 
-  // 2. بناء الهيكل الأساسي (Header)
+  // بناء الهيكل الأساسي (Header)
   const header = document.getElementById('appHeader');
   if (header) {
     header.innerHTML = `
@@ -215,7 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('roleSelect').value = state.currentRole;
   }
 
-  // 3. بناء شريط التبويبات (Navigation)
+  // بناء شريط التبويبات
   const nav = document.getElementById('appNav');
   if (nav) {
     nav.innerHTML = `
@@ -231,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // 4. تسجيل الأحداث العامة
+  // تسجيل الأحداث
   bus.on('render', () => { /* يتم التعامل معه بواسطة المكونات */ });
 
   bus.on('stateSaved', () => {
@@ -258,7 +270,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('⚠️ انقطع الاتصال بالإنترنت، سيتم حفظ البيانات محلياً', 'warning');
   });
 
-  // 5. تحديث الشارات (Badges)
+  // 🔥 التنبيهات الذكية
+  bus.on('alerts', (alerts) => {
+    alerts.forEach(alert => {
+      const type = alert.type === 'danger' ? 'error' : 'warning';
+      showToast(`🚨 ${alert.title}: ${alert.message}`, type, 5000);
+    });
+  });
+
+  // تحديث الشارات
   function updateBadges() {
     const state = stateManager.get();
     const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'senior')).length;
@@ -278,9 +298,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 6. تهيئة المكونات وتعيين التبويب الافتراضي
+  // تعيين التبويب الافتراضي
   let currentTab = 'dashboard';
-
   bus.on('switchTab', (tab) => {
     if (currentTab === tab) return;
     currentTab = tab;
@@ -297,19 +316,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     bus.emit('switchTab', 'dashboard');
   }, 100);
 
-  // 7. بدء المزامنة الدورية
+  // بدء المزامنة الدورية
   setInterval(() => {
     if (navigator.onLine) stateManager.processSyncQueue();
   }, 30000);
 
-  // 8. مراقبة حالة الشبكة
+  // مراقبة حالة الشبكة
   window.addEventListener('online', () => bus.emit('networkOnline'));
   window.addEventListener('offline', () => bus.emit('networkOffline'));
 
-  // 9. طلب إذن الإشعارات
+  // طلب إذن الإشعارات
   requestNotificationPermission();
 
-  // 10. إشعارات المهام
+  // إشعارات المهام (كل دقيقة)
   setInterval(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const state = stateManager.get();
@@ -330,14 +349,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }, 60000);
 
-  // 11. إظهار رسالة الترحيب
+  // رسالة الترحيب
   console.log('🚀 PaedsWard PRO جاهز!');
   console.log('👤 الدور:', state.currentRole);
   console.log('📦 الإصدار:', state._version);
   console.log('👥 المرضى:', state.patients.length);
   console.log('📋 المهام:', state.tasks.length);
 
-  // 12. تنبيه إذا كان هناك طابور مزامنة معلق
+  // تنبيه إذا كان هناك طابور مزامنة معلق
   if (state.syncQueue && state.syncQueue.length > 0) {
     showToast(`🔄 يوجد ${state.syncQueue.length} عملية في طابور المزامنة`, 'warning', 5000);
     if (navigator.onLine) {
@@ -345,6 +364,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 13. التصيير الأولي
+  // 🔥 فحص التنبيهات الأولي
+  stateManager._checkForAlerts();
+
+  // التصيير الأولي
   bus.emit('render');
 });
