@@ -1,3 +1,6 @@
+// ================================================================
+//  مكون الجناح (Ward) – مع تفاعل حقيقي مع الخادم
+// ================================================================
 class WardComponent {
   constructor() {
     this.container = document.getElementById('appContent');
@@ -42,9 +45,9 @@ class WardComponent {
             <div class="meta"><span>⚖️ ${p.weight}كجم</span><span>🩺 ${p.vitals || '—'}</span></div>
             <div class="sub">👨‍⚕️ طبيب الامتياز: ${p.assignedIntern || 'غير معين'}</div>
             <div class="actions">
-              ${hasPermission(role, 'update_vitals') ? `<button class="small secondary" onclick="event.stopPropagation();ward.updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
-              ${hasPermission(role, 'write_notes') ? `<button class="small secondary" onclick="event.stopPropagation();ward.addNote('${p.id}')">📝 ملاحظة</button>` : ''}
-              ${hasPermission(role, 'discharge') ? `<button class="small danger" onclick="event.stopPropagation();ward.dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
+              ${hasPermission(role, 'update_vitals') ? `<button class="small secondary" onclick="ward.updateVitals('${p.id}')">📊 فحوصات</button>` : ''}
+              ${hasPermission(role, 'write_notes') ? `<button class="small secondary" onclick="ward.addNote('${p.id}')">📝 ملاحظة</button>` : ''}
+              ${hasPermission(role, 'discharge') ? `<button class="small danger" onclick="ward.dischargePatient('${p.id}')">⬆️ خروج</button>` : ''}
               ${hasPermission(role, 'add_alert') ? `<button class="small secondary" onclick="ward.addAlert('${p.id}')">🔔 تنبيه</button>` : ''}
             </div>
           </div>
@@ -71,7 +74,7 @@ class WardComponent {
     `);
   }
 
-  submitAdmission() {
+  async submitAdmission() {
     const name = document.getElementById('admName').value.trim();
     const age = parseFloat(document.getElementById('admAge').value);
     const weight = parseFloat(document.getElementById('admWeight').value);
@@ -86,7 +89,6 @@ class WardComponent {
       return;
     }
 
-    const state = stateManager.get();
     const newPatient = {
       id: 'temp_' + uid(),
       name, age, weight, height, bed, diagnosis,
@@ -105,23 +107,26 @@ class WardComponent {
       updatedAt: Date.now()
     };
 
-    state.patients.push(newPatient);
-    stateManager.save();
-    stateManager.addToQueue('patients', 'POST', newPatient, newPatient.id);
-
-    // تنبيه للطبيب الامتياز
-    if (assignedIntern) {
-      stateManager.addAlert(
-        `مريض جديد: ${name}`,
-        `تم قبول ${name} تحت متابعتك. التشخيص: ${diagnosis}`,
-        'intern',
-        assignedIntern
-      );
+    // إضافة عبر StateManager (مزامنة مع الخادم)
+    const result = await stateManager.addItem('patients', newPatient);
+    if (result && result.id) {
+      // تنبيه للطبيب الامتياز
+      if (assignedIntern) {
+        stateManager.addAlert(
+          `مريض جديد: ${name}`,
+          `تم قبول ${name} تحت متابعتك. التشخيص: ${diagnosis}`,
+          'intern',
+          assignedIntern
+        );
+      }
+      closeModal();
+      bus.emit('render');
+      showToast(`✅ تم قبول ${name}`, 'success');
+    } else {
+      // إذا فشل الإضافة، سيتم إضافتها إلى الطابور
+      closeModal();
+      showToast(`✅ تم قبول ${name} (سيتم المزامنة عند عودة الاتصال)`, 'success');
     }
-
-    closeModal();
-    bus.emit('render');
-    showToast(`✅ تم قبول ${name}`, 'success');
   }
 
   viewPatient(id) {
@@ -167,6 +172,7 @@ class WardComponent {
     openModal(html);
   }
 
+  // ─── دوال SOAP ───
   showSoapForm(id) {
     openModal(`
       <h2>📝 إضافة متابعة SOAP</h2>
@@ -181,7 +187,7 @@ class WardComponent {
     `);
   }
 
-  saveSoap(id) {
+  async saveSoap(id) {
     const s = document.getElementById('soapS').value.trim();
     const o = document.getElementById('soapO').value.trim();
     const a = document.getElementById('soapA').value.trim();
@@ -202,46 +208,39 @@ class WardComponent {
       plan: p
     });
     patient.updatedAt = Date.now();
-    stateManager.save();
-    stateManager.addToQueue('patients', 'PATCH', { soap: patient.soap, updatedAt: patient.updatedAt }, patient.id);
+
+    // تحديث عبر StateManager
+    await stateManager.updateItem('patients', id, { soap: patient.soap, updatedAt: patient.updatedAt });
     closeModal();
     bus.emit('render');
     showToast('✅ تم حفظ المتابعة', 'success');
   }
 
-  showHistoryForm(id) { /* نموذج للسيرة المرضية – مختصر */ }
-  showExamForm(id) { /* نموذج للفحص السريري – مختصر */ }
-  showInvestForm(id) { /* نموذج للتحاليل – مختصر */ }
-  showSummaryForm(id) { /* نموذج للملخص – مختصر */ }
+  showHistoryForm(id) { /* نموذج للسيرة المرضية */ }
+  showExamForm(id) { /* نموذج للفحص السريري */ }
+  showInvestForm(id) { /* نموذج للتحاليل */ }
+  showSummaryForm(id) { /* نموذج للملخص */ }
 
-  updateVitals(id) {
+  // ─── تحديث الفحوصات ───
+  async updateVitals(id) {
     const val = prompt('أدخل الفحوصات (مثال: T:37.5 HR:130 SpO₂:96%):');
     if (val === null) return;
-    const state = stateManager.get();
-    const p = state.patients.find(pt => pt.id === id);
-    if (p) {
-      p.vitals = val;
-      p.updatedAt = Date.now();
-      stateManager.save();
-      stateManager.addToQueue('patients', 'PATCH', { vitals: val, updatedAt: p.updatedAt }, p.id);
-      bus.emit('render');
-      showToast('✅ تم تحديث الفحوصات', 'success');
-    }
+    await stateManager.updateItem('patients', id, { vitals: val, updatedAt: Date.now() });
+    bus.emit('render');
+    showToast('✅ تم تحديث الفحوصات', 'success');
   }
 
-  addNote(id) {
+  async addNote(id) {
     const note = prompt('أضف ملاحظة:');
     if (!note) return;
     const state = stateManager.get();
     const p = state.patients.find(pt => pt.id === id);
-    if (p) {
-      p.notes = (p.notes || '') + '\n' + today() + ' ' + timeNow() + ': ' + note;
-      p.updatedAt = Date.now();
-      stateManager.save();
-      stateManager.addToQueue('patients', 'PATCH', { notes: p.notes, updatedAt: p.updatedAt }, p.id);
-      bus.emit('render');
-      showToast('📝 تم إضافة الملاحظة', 'success');
-    }
+    if (!p) return;
+    p.notes = (p.notes || '') + '\n' + today() + ' ' + timeNow() + ': ' + note;
+    p.updatedAt = Date.now();
+    await stateManager.updateItem('patients', id, { notes: p.notes, updatedAt: p.updatedAt });
+    bus.emit('render');
+    showToast('📝 تم إضافة الملاحظة', 'success');
   }
 
   addAlert(id) {
@@ -259,18 +258,11 @@ class WardComponent {
     showToast('✅ تم إرسال التنبيه', 'success');
   }
 
-  dischargePatient(id) {
+  async dischargePatient(id) {
     if (!confirm('تأكيد خروج المريض؟')) return;
-    const state = stateManager.get();
-    const p = state.patients.find(pt => pt.id === id);
-    if (!p) return;
-    p.status = 'discharged';
-    p.dischargeDate = today();
-    p.updatedAt = Date.now();
-    stateManager.save();
-    stateManager.addToQueue('patients', 'PATCH', { status: p.status, dischargeDate: p.dischargeDate, updatedAt: p.updatedAt }, p.id);
+    await stateManager.updateItem('patients', id, { status: 'discharged', dischargeDate: today(), updatedAt: Date.now() });
     bus.emit('render');
-    showToast(`⬆️ تم خروج ${p.name}`, 'success');
+    showToast(`⬆️ تم خروج المريض`, 'success');
   }
 }
 
