@@ -1,38 +1,28 @@
 // ================================================================
 //  app.js – نقطة الانطلاق الرئيسية (Entry Point)
-//  مع واجهة تسجيل دخول محسنة ونظام تنبيهات
 // ================================================================
 
-import { getRoleLabel, getRoleEmoji, TABS, DEFAULT_USERS, hasPermission } from './core/constants.js';
-
-// ─── دوال مساعدة ───
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function today() { return new Date().toISOString().split('T')[0]; }
 function timeNow() { return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); }
 
-// ─── دوال الـ Headers ───
 function getHeaders() {
   const state = stateManager.get();
   return {
     'Content-Type': 'application/json',
-    'X-User-Role': state.currentRole || 'junior',
+    'X-User-Role': state.currentRole || 'intern',
     'X-User-Name': state.currentUser?.name || 'جهاز محلي'
   };
 }
 window.getHeaders = getHeaders;
 
-// ─── عرض الرسائل التنبيهية (Toast) ───
 function showToast(message, type = 'info', duration = 3500) {
   const container = document.getElementById('toastContainer');
-  if (!container) {
-    console.warn('⚠️ Toast container غير موجود');
-    return;
-  }
+  if (!container) { console.warn('⚠️ Toast container غير موجود'); return; }
   const toast = document.createElement('div');
   toast.className = `toast-item ${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
@@ -40,7 +30,6 @@ function showToast(message, type = 'info', duration = 3500) {
 }
 window.showToast = showToast;
 
-// ─── فتح وإغلاق النافذة المنبثقة ───
 function openModal(html) {
   const modal = document.getElementById('modal');
   const content = document.getElementById('modalContent');
@@ -61,7 +50,6 @@ function closeModalOverlay(e) {
 }
 window.closeModalOverlay = closeModalOverlay;
 
-// ─── معالج تسجيل الدخول (محسّن) ───
 function handleLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
@@ -78,7 +66,6 @@ function handleLogin() {
 }
 window.handleLogin = handleLogin;
 
-// ─── معالج التسجيل (مستخدم جديد) ───
 function showRegisterForm() {
   openModal(`
     <h2>📝 إنشاء حساب جديد</h2>
@@ -90,10 +77,11 @@ function showRegisterForm() {
     <input id="regPassword" type="password" placeholder="••••••••">
     <label>الدور</label>
     <select id="regRole" class="form-input">
-      <option value="senior">استشاري</option>
-      <option value="junior" selected>طبيب مبتدئ</option>
-      <option value="nurse">ممرض</option>
-      <option value="admin">إداري</option>
+      <option value="director">مدير</option>
+      <option value="specialist">اختصاصي</option>
+      <option value="deputy">نائب</option>
+      <option value="general">عمومي</option>
+      <option value="intern" selected>طبيب امتياز</option>
     </select>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button onclick="handleRegister()" class="success" style="flex:1;">✅ تسجيل</button>
@@ -108,23 +96,20 @@ function handleRegister() {
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value.trim();
   const role = document.getElementById('regRole').value;
-
   if (!name || !email || !password || password.length < 4) {
     showToast('⚠️ جميع الحقول مطلوبة وكلمة المرور 4 أحرف على الأقل', 'error');
     return;
   }
-
   try {
     const newUser = stateManager.registerUser(name, email, password, role);
     closeModal();
-    showToast(`✅ تم إنشاء حساب ${newUser.name} بنجاح! يمكنك تسجيل الدخول الآن.`, 'success');
+    showToast(`✅ تم إنشاء حساب ${newUser.name} بنجاح!`, 'success');
   } catch (e) {
     showToast(`⚠️ ${e.message}`, 'error');
   }
 }
 window.handleRegister = handleRegister;
 
-// ─── تبديل الأدوار ───
 function switchRole(role) {
   const state = stateManager.get();
   state.currentRole = role;
@@ -136,7 +121,6 @@ function switchRole(role) {
 }
 window.switchRole = switchRole;
 
-// ─── البحث العالمي ───
 function searchGlobal(query) {
   const state = stateManager.get();
   state.searchQuery = query.toLowerCase();
@@ -145,7 +129,6 @@ function searchGlobal(query) {
 }
 window.searchGlobal = searchGlobal;
 
-// ─── تصدير البيانات ───
 function exportData() {
   const state = stateManager.get();
   const data = JSON.stringify(state, null, 2);
@@ -153,14 +136,13 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `PaedsWard_Backup_${today()}.json`;
+  a.download = `CoreWard_Backup_${today()}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('📤 تم تصدير البيانات بنجاح', 'success');
 }
 window.exportData = exportData;
 
-// ─── استيراد البيانات ───
 function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -176,8 +158,9 @@ function importData(event) {
       if (data.teamMessages) state.teamMessages = data.teamMessages;
       if (data.teamMembers) state.teamMembers = data.teamMembers;
       if (data.auditLog) state.auditLog = data.auditLog;
+      if (data.alerts) state.alerts = data.alerts;
       if (data.syncQueue) state.syncQueue = data.syncQueue;
-      state._version = '7.0.0';
+      state._version = '1.0.0';
       await stateManager.save();
       bus.emit('render');
       showToast('✅ تم استيراد البيانات بنجاح', 'success');
@@ -190,29 +173,27 @@ function importData(event) {
 }
 window.importData = importData;
 
-// ─── طلب إذن الإشعارات ───
 function requestNotificationPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
 }
 
-// ─── تهيئة التطبيق ───
 document.addEventListener('DOMContentLoaded', async () => {
   await stateManager.load();
   const state = stateManager.get();
 
-  // بناء الهيكل الأساسي (Header)
   const header = document.getElementById('appHeader');
   if (header) {
     header.innerHTML = `
-      <div class="brand" onclick="bus.emit('switchTab', 'dashboard')">🏥 PaedsWard <small>· احترافي</small></div>
+      <div class="brand" onclick="bus.emit('switchTab', 'dashboard')">🏥 CoreWard <small>· ذكي</small></div>
       <div class="header-actions">
         <select id="roleSelect" onchange="switchRole(this.value)">
-          <option value="senior">👨‍⚕️ استشاري</option>
-          <option value="junior">🧑‍⚕️ مبتدئ</option>
-          <option value="nurse">👩‍⚕️ ممرض</option>
-          <option value="admin">📋 إداري</option>
+          <option value="director">👨‍⚕️ مدير</option>
+          <option value="specialist">🩺 اختصاصي</option>
+          <option value="deputy">👨‍⚕️ نائب</option>
+          <option value="general">🧑‍⚕️ عمومي</option>
+          <option value="intern">👨‍🎓 طبيب امتياز</option>
         </select>
         <button id="adminBtn" onclick="bus.emit('openAdmin')">🔑</button>
         <button onclick="exportData()" title="تصدير">📤</button>
@@ -227,7 +208,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('roleSelect').value = state.currentRole;
   }
 
-  // بناء شريط التبويبات
   const nav = document.getElementById('appNav');
   if (nav) {
     nav.innerHTML = `
@@ -243,9 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // تسجيل الأحداث
-  bus.on('render', () => { /* يتم التعامل معه بواسطة المكونات */ });
-
+  bus.on('render', () => {});
   bus.on('stateSaved', () => {
     const dot = document.getElementById('syncDot');
     const label = document.getElementById('syncLabel');
@@ -270,7 +248,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('⚠️ انقطع الاتصال بالإنترنت، سيتم حفظ البيانات محلياً', 'warning');
   });
 
-  // 🔥 التنبيهات الذكية
   bus.on('alerts', (alerts) => {
     alerts.forEach(alert => {
       const type = alert.type === 'danger' ? 'error' : 'warning';
@@ -278,13 +255,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // تحديث الشارات
   function updateBadges() {
     const state = stateManager.get();
-    const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'senior')).length;
+    const pending = state.tasks.filter(t => !t.done && (t.assignee === state.currentRole || state.currentRole === 'director')).length;
     const urgent = state.handovers.filter(h => h.urgent && !h.acknowledged).length;
-    const unread = state.teamMessages.filter(m => !m.read).length;
-    const badgeMap = { tasks: pending, handover: urgent, team: unread };
+    const unreadAlerts = state.alerts.filter(a => !a.read).length;
+    const badgeMap = { tasks: pending, handover: urgent, team: unreadAlerts };
     Object.entries(badgeMap).forEach(([id, count]) => {
       const el = document.getElementById(`badge_${id}`);
       if (el) {
@@ -294,11 +270,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const adminBtn = document.getElementById('adminBtn');
     if (adminBtn) {
-      adminBtn.classList.toggle('visible', state.currentRole === 'senior');
+      adminBtn.classList.toggle('visible', state.currentRole === 'director');
     }
   }
 
-  // تعيين التبويب الافتراضي
   let currentTab = 'dashboard';
   bus.on('switchTab', (tab) => {
     if (currentTab === tab) return;
@@ -316,19 +291,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     bus.emit('switchTab', 'dashboard');
   }, 100);
 
-  // بدء المزامنة الدورية
   setInterval(() => {
     if (navigator.onLine) stateManager.processSyncQueue();
   }, 30000);
 
-  // مراقبة حالة الشبكة
   window.addEventListener('online', () => bus.emit('networkOnline'));
   window.addEventListener('offline', () => bus.emit('networkOffline'));
 
-  // طلب إذن الإشعارات
   requestNotificationPermission();
 
-  // إشعارات المهام (كل دقيقة)
   setInterval(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const state = stateManager.get();
@@ -349,14 +320,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }, 60000);
 
-  // رسالة الترحيب
-  console.log('🚀 PaedsWard PRO جاهز!');
+  console.log('🚀 CoreWard جاهز!');
   console.log('👤 الدور:', state.currentRole);
   console.log('📦 الإصدار:', state._version);
   console.log('👥 المرضى:', state.patients.length);
   console.log('📋 المهام:', state.tasks.length);
 
-  // تنبيه إذا كان هناك طابور مزامنة معلق
   if (state.syncQueue && state.syncQueue.length > 0) {
     showToast(`🔄 يوجد ${state.syncQueue.length} عملية في طابور المزامنة`, 'warning', 5000);
     if (navigator.onLine) {
@@ -364,9 +333,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 🔥 فحص التنبيهات الأولي
   stateManager._checkForAlerts();
-
-  // التصيير الأولي
   bus.emit('render');
 });
