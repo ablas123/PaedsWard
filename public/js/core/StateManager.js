@@ -1,5 +1,5 @@
 // ================================================================
-//  مدير الحالة (State Manager) – مع طابور مزامنة ذكي
+//  مدير الحالة (State Manager) – مع طابور مزامنة ذكي + نظام تنبيهات
 // ================================================================
 class StateManager {
   constructor() {
@@ -20,6 +20,7 @@ class StateManager {
     };
     this.syncInProgress = false;
     this.offlineMode = !navigator.onLine;
+    this.notifications = [];
   }
 
   async load() {
@@ -47,6 +48,7 @@ class StateManager {
       this.state._version = '7.0.0';
       await this.store.setItem('state', this.state);
       bus.emit('stateSaved', this.state);
+      this._checkForAlerts(); // 🔥 NEW: فحص التنبيهات تلقائياً بعد الحفظ
       return true;
     } catch (e) {
       console.warn('⚠️ فشل حفظ الحالة:', e);
@@ -105,7 +107,7 @@ class StateManager {
     }
   }
 
-  // ─── معالجة طابور المزامنة ───
+  // ─── معالجة طابور المزامنة (مع دعم tempId → realId) ───
   async processSyncQueue() {
     if (this.syncInProgress || !navigator.onLine) return;
     if (this.state.syncQueue.length === 0) return;
@@ -127,6 +129,7 @@ class StateManager {
         let currentId = firstOp.entityId;
         const headers = this.getHeaders();
 
+        // 🔥 POST أولاً للحصول على المعرف الحقيقي
         if (firstOp.method === 'POST') {
           try {
             const url = `/api/${firstOp.collection}`;
@@ -143,6 +146,7 @@ class StateManager {
             const realId = result.item?.id || result.id || result._id;
 
             if (realId && realId !== currentId) {
+              // 🔥 تحديث جميع العمليات اللاحقة لهذا الكيان
               for (let i = 1; i < operations.length; i++) {
                 const op = operations[i];
                 if (op.entityId === currentId) {
@@ -150,12 +154,12 @@ class StateManager {
                   if (op.data) this._updateAllEntityIds(op.data, currentId, realId);
                 }
               }
-              // تحديث البيانات المحلية
+              // 🔥 تحديث البيانات المحلية (patients, tasks, etc.)
               const localData = this.state[firstOp.collection] || [];
               const item = localData.find(item => item.id === currentId);
               if (item) {
                 item.id = realId;
-                // تحديث المراجع الأخرى
+                // تحديث المراجع الأخرى (مثل patientId في المهام)
                 for (const [coll, items] of Object.entries(this.state)) {
                   if (Array.isArray(items)) {
                     for (const ref of items) {
@@ -174,6 +178,7 @@ class StateManager {
           }
         }
 
+        // 🔥 تنفيذ العمليات المتبقية (PATCH, DELETE, إلخ)
         for (const op of operations) {
           if (op.method === 'POST') continue;
           try {
@@ -196,6 +201,7 @@ class StateManager {
           }
         }
 
+        // 🔥 إزالة العمليات الناجحة من الطابور
         this.state.syncQueue = this.state.syncQueue.filter(op => {
           const k = `${op.collection}:${op.entityId}`;
           return k !== key;
@@ -212,10 +218,110 @@ class StateManager {
     }
   }
 
+  // ─── 🔥 نظام التنبيهات الذكية ───
+  _checkForAlerts() {
+    const state = this.state;
+    const now = new Date();
+    const alerts = [];
+
+    // 1. المهام المتأخرة أو المستحقة قريباً
+    state.tasks.filter(t => !t.done).forEach(t => {
+      if (t.dueDate && t.dueTime) {
+        const dueDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
+        const diffMin = (dueDateTime - now) / 60000;
+        if (diffMin < 0) {
+          alerts.push({
+            type: 'danger',
+            title: '⏰ مهمة متأخرة',
+            message: `${t.text} (كانت مستحقة منذ ${Math.abs(Math.round(diffMin))} دقيقة)`,
+            taskId: t.id
+          });
+        } else if (diffMin <= 30) {
+          alerts.push({
+            type: 'warning',
+            title: '🕐 مهمة مستحقة قريباً',
+            message: `${t.text} (مستحقة خلال ${Math.round(diffMin)} دقيقة)`,
+            taskId: t.id
+          });
+        }
+      }
+    });
+
+    // 2. المرضى في حالة حرجة
+    state.patients.filter(p => p.patientStatus === 'critical' && p.status !== 'discharged').forEach(p => {
+      alerts.push({
+        type: 'danger',
+        title: '🚨 مريض بحالة حرجة',
+        message: `${p.name} (${p.diagnosis}) - سرير ${p.bed}`,
+        patientId: p.id
+      });
+    });
+
+    // 3. تسليمات عاجلة غير مقروءة
+    state.handovers.filter(h => h.urgent && !h.acknowledged).forEach(h => {
+      alerts.push({
+        type: 'warning',
+        title: '📝 تسليم عاجل غير مقروء',
+        message: `من ${h.author}: ${h.situation}`,
+        handoverId: h.id
+      });
+    });
+
+    // إرسال التنبيهات
+    if (alerts.length > 0) {
+      bus.emit('alerts', alerts);
+      // حفظ التنبيهات في الحالة لتجنب التكرار
+      this.notifications = alerts;
+    } else {
+      this.notifications = [];
+    }
+  }
+
+  // ─── دوال إدارة المستخدمين (للتسجيل) ───
+  getUsers() {
+    try {
+      const data = localStorage.getItem('paedsward_users');
+      return data ? JSON.parse(data) : [];
+    } catch { return []; }
+  }
+
+  saveUsers(users) {
+    localStorage.setItem('paedsward_users', JSON.stringify(users));
+  }
+
+  registerUser(name, email, password, role) {
+    const users = this.getUsers();
+    if (users.find(u => u.email === email)) {
+      throw new Error('البريد الإلكتروني مستخدم بالفعل');
+    }
+    const newUser = {
+      name,
+      email,
+      password: btoa(password), // تشفير بسيط
+      role: role || 'junior',
+      active: true
+    };
+    users.push(newUser);
+    this.saveUsers(users);
+    return newUser;
+  }
+
+  loginUser(email, password) {
+    const users = this.getUsers();
+    const user = users.find(u => u.email === email && atob(u.password) === password);
+    if (!user) throw new Error('البريد أو كلمة المرور غير صحيحة');
+    if (!user.active) throw new Error('الحساب غير مفعل');
+    this.state.currentUser = { email: user.email, name: user.name, role: user.role };
+    this.state.currentRole = user.role;
+    this.save();
+    return user;
+  }
+
   _handleOnline() {
     this.offlineMode = false;
     bus.emit('networkOnline');
     this.processSyncQueue();
+    this._checkForAlerts(); // 🔥 تحديث التنبيهات عند عودة الاتصال
   }
 
   _handleOffline() {
