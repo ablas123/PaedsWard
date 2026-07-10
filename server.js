@@ -1,3 +1,6 @@
+// CoreWard - Backend Server
+// Node.js + Express + File-based JSON Storage
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -6,245 +9,325 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(compression());
+const PORT = process.env.PORT || 3000;
+const DB_PATH = path.join(__dirname, 'database.json');
+const BACKUP_DIR = path.join(__dirname, 'backups');
+const BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const MAX_BACKUPS = 10;
+
+// ============ Middleware ============
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-const DB_FILE = path.join(__dirname, 'database.json');
-let db = null;
-let dbLock = false;
-
-// ─── تحميل وحفظ قاعدة البيانات ───
-function loadDatabase() {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    } else {
-      db = {
-        patients: [],
-        tasks: [],
-        handovers: [],
-        clinicSlots: [],
-        teamMessages: [],
-        teamMembers: [
-          { id: 'u1', name: 'المدير', role: 'director', email: 'admin@ward.com', password: bcrypt.hashSync('admin123', 10) }
-        ],
-        users: [
-          { id: 'u1', name: 'المدير', role: 'director', email: 'admin@ward.com', password: bcrypt.hashSync('admin123', 10) }
-        ],
-        auditLog: [],
-        _version: '2.0.0'
-      };
-      saveDatabase();
+// ============ Default Data ============
+const DEFAULT_DATA = {
+  users: [
+    {
+      id: 'u1',
+      name: 'مدير النظام',
+      email: 'admin@ward.com',
+      password: bcrypt.hashSync('admin123', 10),
+      role: 'director',
+      createdAt: new Date().toISOString()
     }
-  } catch (e) {
-    console.error('❌ فشل تحميل قاعدة البيانات:', e);
-    db = { patients: [], tasks: [], handovers: [], clinicSlots: [], teamMessages: [], teamMembers: [], users: [], auditLog: [] };
-  }
-}
+  ],
+  patients: [],
+  tasks: [],
+  handovers: [],
+  clinicSlots: [],
+  teamMembers: [],
+  teamMessages: [],
+  auditLog: [],
+  alerts: [],
+  syncQueue: []
+};
 
-function saveDatabase() {
-  if (dbLock) return;
-  dbLock = true;
+// ============ Database Helpers ============
+function readDB() {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-  } catch (e) {
-    console.error('❌ فشل حفظ قاعدة البيانات:', e);
-  } finally {
-    dbLock = false;
+    if (!fs.existsSync(DB_PATH)) {
+      writeDB(DEFAULT_DATA);
+      return DEFAULT_DATA;
+    }
+    const raw = fs.readFileSync(DB_PATH, 'utf-8');
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('❌ Error reading database:', err);
+    return DEFAULT_DATA;
   }
 }
 
-// ─── RBAC ───
+function writeDB(data) {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('❌ Error writing database:', err);
+    return false;
+  }
+}
+
+function generateId(prefix = 'id') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// ============ Audit Log ============
+function addAuditLog(user, action, details) {
+  const db = readDB();
+  const entry = {
+    id: generateId('log'),
+    timestamp: new Date().toISOString(),
+    userId: user?.id || 'system',
+    userName: user?.name || 'System',
+    userRole: user?.role || 'system',
+    action,
+    details
+  };
+  db.auditLog.unshift(entry);
+  if (db.auditLog.length > 1000) db.auditLog = db.auditLog.slice(0, 1000);
+  writeDB(db);
+  return entry;
+}
+
+// ============ Backup System ============
+function ensureBackupDir() {
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+}
+
+function createBackup() {
+  try {
+    ensureBackupDir();
+    if (!fs.existsSync(DB_PATH)) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(BACKUP_DIR, `backup_${timestamp}.json`);
+    fs.copyFileSync(DB_PATH, backupPath);
+
+    // Keep only last MAX_BACKUPS
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.startsWith('backup_') && f.endsWith('.json'))
+      .sort()
+      .reverse();
+
+    files.slice(MAX_BACKUPS).forEach(f => {
+      try { fs.unlinkSync(path.join(BACKUP_DIR, f)); } catch (e) {}
+    });
+
+    console.log(`✅ Backup created: ${backupPath}`);
+  } catch (err) {
+    console.error('❌ Backup failed:', err);
+  }
+}
+
+// ============ Auth Middleware ============
+function authMiddleware(req, res, next) {
+  const userId = req.headers['x-user-id'];
+  const userRole = req.headers['x-user-role'];
+  if (!userId || !userRole) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const db = readDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user) return res.status(401).json({ error: 'User not found' });
+  req.user = user;
+  next();
+}
+
+// ============ Roles & Permissions ============
 const ROLES = {
-  director: ['view_all', 'manage_team', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover', 'manage_alerts', 'manage_users'],
-  specialist: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
-  deputy: ['view_all', 'discharge', 'approve_plan', 'view_reports', 'create_task', 'view_patients', 'admit', 'write_notes', 'update_vitals', 'create_handover'],
-  general: ['admit', 'write_notes', 'view_patients', 'create_handover', 'add_alert'],
-  intern: ['admit', 'write_notes', 'view_patients', 'complete_tasks']
+  director: ['manage_users', 'manage_patients', 'manage_tasks', 'manage_handovers', 'add_alert', 'view_reports', 'view_audit', 'manage_clinic', 'manage_team'],
+  specialist: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports'],
+  deputy: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports'],
+  general: ['admit_patients', 'write_notes', 'view_patients', 'create_handovers', 'add_alert'],
+  intern: ['admit_patients', 'write_notes', 'view_assigned_patients', 'complete_tasks']
 };
 
 function hasPermission(role, permission) {
-  return ROLES[role] && ROLES[role].includes(permission);
+  const perms = ROLES[role] || [];
+  return perms.includes(permission) || role === 'director';
 }
 
-function getRoleFromHeaders(req) {
-  return req.headers['x-user-role'] || 'intern';
-}
+// ============ API Routes ============
 
-function getUserName(req) {
-  return req.headers['x-user-name'] || 'مستخدم مجهول';
-}
-
-function addAuditLog(action, details, req) {
-  const role = getRoleFromHeaders(req);
-  const name = getUserName(req);
-  db.auditLog.push({
-    timestamp: new Date().toISOString(),
-    user: name,
-    role: role,
-    action: action,
-    details: details,
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-  });
-  if (db.auditLog.length > 500) db.auditLog = db.auditLog.slice(-500);
-  saveDatabase();
-}
-
-// ============================================================
-//  نقاط النهاية (API)
-// ============================================================
-
-// ─── الحالة الكاملة ───
-app.get('/api/state', (req, res) => {
-  loadDatabase();
-  res.json(db);
-});
-
-// ─── تسجيل الدخول ───
-app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
-  loadDatabase();
-  const user = db.users.find(u => u.email === email);
-  if (!user) {
-    return res.status(401).json({ error: 'البريد الإلكتروني غير موجود' });
-  }
-  const valid = bcrypt.compareSync(password, user.password);
-  if (!valid) {
-    return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
-  }
-  res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-});
-
-// ─── إنشاء مستخدم جديد (للمدير فقط) ───
-app.post('/api/users', (req, res) => {
-  const { name, email, password, role } = req.body;
-  const roleHeader = getRoleFromHeaders(req);
-  if (!hasPermission(roleHeader, 'manage_users')) {
-    return res.status(403).json({ error: 'غير مصرح لك بإنشاء مستخدمين' });
-  }
-  loadDatabase();
-  if (db.users.find(u => u.email === email)) {
-    return res.status(400).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
-  }
-  const newUser = {
-    id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
-    name,
-    email,
-    password: bcrypt.hashSync(password, 10),
-    role: role || 'intern'
-  };
-  db.users.push(newUser);
-  // إضافة إلى teamMembers أيضاً للتوافق
-  db.teamMembers.push({ id: newUser.id, name: newUser.name, role: newUser.role, email: newUser.email });
-  saveDatabase();
-  addAuditLog('إنشاء مستخدم', `تم إنشاء حساب ${name} بدور ${role}`, req);
-  res.status(201).json({ success: true, user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role } });
-});
-
-// ─── إضافة عنصر جديد ───
-app.post('/api/:collection', (req, res) => {
-  const { collection } = req.params;
-  const newItem = req.body;
-  const role = getRoleFromHeaders(req);
-
-  const permMap = {
-    patients: 'admit',
-    tasks: 'create_task',
-    handovers: 'create_handover',
-    clinicSlots: 'manage_clinic',
-    teamMessages: 'send_alerts'
-  };
-  const requiredPerm = permMap[collection];
-  if (requiredPerm && !hasPermission(role, requiredPerm)) {
-    return res.status(403).json({ error: 'غير مصرح لك بهذه العملية' });
-  }
-
-  loadDatabase();
-  if (!db[collection]) db[collection] = [];
-  if (!newItem.id) newItem.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  newItem.updatedAt = Date.now();
-  db[collection].push(newItem);
-  saveDatabase();
-
-  addAuditLog(`إضافة ${collection}`, `تم إضافة عنصر جديد: ${newItem.id}`, req);
-  res.status(201).json({ success: true, item: newItem });
-});
-
-// ─── تحديث عنصر ───
-app.patch('/api/:collection/:id', (req, res) => {
-  const { collection, id } = req.params;
-  const updates = req.body;
-  const role = getRoleFromHeaders(req);
-
-  if (collection === 'patients' && !hasPermission(role, 'view_patients')) {
-    return res.status(403).json({ error: 'غير مصرح لك بتحديث بيانات المرضى' });
-  }
-
-  loadDatabase();
-  if (!db[collection]) return res.status(404).json({ error: 'Collection not found' });
-  const item = db[collection].find(item => item.id === id);
-  if (!item) return res.status(404).json({ error: 'Item not found' });
-
-  Object.assign(item, updates);
-  item.updatedAt = Date.now();
-  saveDatabase();
-
-  addAuditLog(`تحديث ${collection}`, `تم تحديث عنصر: ${id}`, req);
-  res.json({ success: true, item });
-});
-
-// ─── حذف عنصر ───
-app.delete('/api/:collection/:id', (req, res) => {
-  const { collection, id } = req.params;
-  const role = getRoleFromHeaders(req);
-
-  if (collection === 'patients' && !hasPermission(role, 'discharge')) {
-    return res.status(403).json({ error: 'غير مصرح لك بحذف مرضى' });
-  }
-  if (collection === 'tasks' && !hasPermission(role, 'create_task')) {
-    return res.status(403).json({ error: 'غير مصرح لك بحذف مهام' });
-  }
-
-  loadDatabase();
-  if (!db[collection]) return res.status(404).json({ error: 'Collection not found' });
-  const index = db[collection].findIndex(item => item.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Item not found' });
-
-  const deleted = db[collection][index];
-  db[collection].splice(index, 1);
-  saveDatabase();
-
-  addAuditLog(`حذف ${collection}`, `تم حذف عنصر: ${id} (${deleted.name || deleted.text || ''})`, req);
-  res.json({ success: true });
-});
-
-// ─── Ping ───
+// Ping (keep-alive)
 app.get('/api/ping', (req, res) => {
-  res.json({ status: 'awake', time: new Date().toISOString() });
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// ─── نسخ احتياطي ───
-const BACKUP_DIR = path.join(__dirname, 'backups');
-if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
+// Login
+app.post('/api/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    const db = readDB();
+    const user = db.users.find(u => u.email === email);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-setInterval(() => {
-  loadDatabase();
-  const filename = `backup_${Date.now()}.json`;
-  fs.writeFileSync(path.join(BACKUP_DIR, filename), JSON.stringify(db, null, 2));
-  const files = fs.readdirSync(BACKUP_DIR).sort();
-  if (files.length > 10) {
-    const toDelete = files.slice(0, files.length - 10);
-    for (const f of toDelete) fs.unlinkSync(path.join(BACKUP_DIR, f));
+    const valid = bcrypt.compareSync(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+    addAuditLog(user, 'login', 'User logged in');
+
+    const { password: _, ...safeUser } = user;
+    res.json({ success: true, user: safeUser });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
   }
-  console.log('✅ نسخ احتياطي:', filename);
-}, 6 * 60 * 60 * 1000);
+});
 
-const PORT = process.env.PORT || 3000;
+// Get full state (for sync)
+app.get('/api/state', authMiddleware, (req, res) => {
+  try {
+    const db = readDB();
+    const { users, password, ...safeUsers } = { users: db.users.map(u => { const { password: _, ...rest } = u; return rest; }) };
+    res.json({
+      patients: db.patients,
+      tasks: db.tasks,
+      handovers: db.handovers,
+      clinicSlots: db.clinicSlots,
+      teamMembers: db.teamMembers,
+      teamMessages: db.teamMessages,
+      auditLog: db.auditLog,
+      alerts: db.alerts,
+      users: db.users.map(u => { const { password: _, ...rest } = u; return rest; })
+    });
+  } catch (err) {
+    console.error('State error:', err);
+    res.status(500).json({ error: 'Failed to load state' });
+  }
+});
+
+// Sync (receive client changes)
+app.post('/api/sync', authMiddleware, (req, res) => {
+  try {
+    const { collection, action, item, id, updates } = req.body;
+    const db = readDB();
+
+    if (!db[collection]) {
+      return res.status(400).json({ error: 'Invalid collection' });
+    }
+
+    let result;
+    const now = new Date().toISOString();
+
+    if (action === 'add') {
+      const newItem = { ...item, id: item.id || generateId(collection.slice(0, 3)), createdAt: now, updatedAt: now, createdBy: req.user.id };
+      db[collection].push(newItem);
+      result = newItem;
+      addAuditLog(req.user, `add_${collection}`, `Added to ${collection}`);
+    } else if (action === 'update') {
+      const idx = db[collection].findIndex(x => x.id === id);
+      if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+
+      // Conflict resolution: server wins if newer
+      const serverTime = new Date(db[collection][idx].updatedAt || 0).getTime();
+      const clientTime = new Date(updates.updatedAt || 0).getTime();
+
+      if (serverTime > clientTime) {
+        result = db[collection][idx];
+      } else {
+        db[collection][idx] = { ...db[collection][idx], ...updates, updatedAt: now, updatedBy: req.user.id };
+        result = db[collection][idx];
+      }
+      addAuditLog(req.user, `update_${collection}`, `Updated ${id}`);
+    } else if (action === 'delete') {
+      const idx = db[collection].findIndex(x => x.id === id);
+      if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+      db[collection].splice(idx, 1);
+      result = { success: true };
+      addAuditLog(req.user, `delete_${collection}`, `Deleted ${id}`);
+    }
+
+    writeDB(db);
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('Sync error:', err);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// Create user (Director only)
+app.post('/api/users', authMiddleware, (req, res) => {
+  try {
+    if (!hasPermission(req.user.role, 'manage_users')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: 'All fields required' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email' });
+    }
+    if (password.length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    }
+    if (!ROLES[role]) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const db = readDB();
+    if (db.users.find(u => u.email === email)) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    const newUser = {
+      id: generateId('u'),
+      name,
+      email,
+      password: bcrypt.hashSync(password, 10),
+      role,
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(newUser);
+    writeDB(db);
+
+    addAuditLog(req.user, 'create_user', `Created user ${email}`);
+
+    const { password: _, ...safeUser } = newUser;
+    res.json({ success: true, user: safeUser });
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// List users
+app.get('/api/users', authMiddleware, (req, res) => {
+  const db = readDB();
+  res.json(db.users.map(u => { const { password: _, ...rest } = u; return rest; }));
+});
+
+// Catch-all for SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ============ Start Server ============
 app.listen(PORT, () => {
-  loadDatabase();
-  console.log(`🚀 CoreWard PRO running on port ${PORT}`);
-  console.log(`📂 Database: ${DB_FILE}`);
-  console.log(`📂 Backups: ${BACKUP_DIR}`);
+  console.log(`\n🏥 CoreWard Server is running on port ${PORT}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`👤 Admin: admin@ward.com / admin123\n`);
+
+  // Initial backup
+  ensureBackupDir();
+  createBackup();
+
+  // Schedule backups
+  setInterval(createBackup, BACKUP_INTERVAL_MS);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, creating final backup...');
+  createBackup();
+  process.exit(0);
 });
