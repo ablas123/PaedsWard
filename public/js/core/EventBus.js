@@ -1,93 +1,68 @@
-// CoreWard - EventBus (Pub/Sub Pattern)
-// Central event system for component communication
+// CoreWard - EventBus (Simplified + Fixed)
+// Pub/Sub pattern for component communication
 
-class EventBus {
-  constructor() {
-    this.listeners = Object.create(null); // cleaner than {}
-  }
+(function() {
+  'use strict';
 
-  /**
-   * Subscribe to an event
-   * @param {string} event - Event name
-   * @param {Function} callback - Handler function
-   * @returns {Function} Unsubscribe function
-   */
-  on(event, callback) {
-    if (typeof callback !== 'function') {
-      throw new TypeError('EventBus.on: callback must be a function');
-    }
-    if (!this.listeners[event]) this.listeners[event] = [];
-    this.listeners[event].push(callback);
+  var listeners = {};
 
-    // Return unsubscribe function
-    return () => this.off(event, callback);
-  }
-
-  /**
-   * Unsubscribe from an event
-   * @param {string} event - Event name
-   * @param {Function} callback - Handler to remove
-   */
-  off(event, callback) {
-    if (!this.listeners[event]) return;
-    if (!callback) {
-      // Remove all listeners for this event
-      delete this.listeners[event];
-      return;
-    }
-    this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
-    if (this.listeners[event].length === 0) {
-      delete this.listeners[event];
-    }
-  }
-
-  /**
-   * Emit an event with data
-   * @param {string} event - Event name
-   * @param {any} data - Data to pass to listeners
-   */
-  emit(event, data) {
-    if (!this.listeners[event]) return;
-    // Copy array to prevent mutation during iteration
-    const handlers = this.listeners[event].slice();
-    handlers.forEach(handler => {
-      try {
-        handler(data);
-      } catch (err) {
-        console.error(`[EventBus] Error in handler for "${event}":`, err);
+  var EventBus = {
+    on: function(event, callback) {
+      if (typeof callback !== 'function') {
+        throw new TypeError('EventBus.on: callback must be a function');
       }
-    });
-  }
+      if (!listeners[event]) {
+        listeners[event] = [];
+      }
+      listeners[event].push(callback);
+      
+      // Return unsubscribe function
+      return function() {
+        EventBus.off(event, callback);
+      };
+    },
 
-  /**
-   * Subscribe to an event once (auto-unsubscribe after first call)
-   * @param {string} event - Event name
-   * @param {Function} callback - Handler function
-   */
-  once(event, callback) {
-    const wrapped = (data) => {
-      this.off(event, wrapped);
-      callback(data);
-    };
-    this.on(event, wrapped);
-  }
+    off: function(event, callback) {
+      if (!listeners[event]) return;
+      if (!callback) {
+        delete listeners[event];
+        return;
+      }
+      listeners[event] = listeners[event].filter(function(cb) {
+        return cb !== callback;
+      });
+      if (listeners[event].length === 0) {
+        delete listeners[event];
+      }
+    },
 
-  /**
-   * Check if event has listeners
-   * @param {string} event - Event name
-   * @returns {boolean}
-   */
-  has(event) {
-    return !!(this.listeners[event] && this.listeners[event].length > 0);
-  }
+    emit: function(event, data) {
+      if (!listeners[event]) return;
+      var handlers = listeners[event].slice();
+      for (var i = 0; i < handlers.length; i++) {
+        try {
+          handlers[i](data);
+        } catch (err) {
+          console.error('[EventBus] Error in handler for "' + event + '":', err);
+        }
+      }
+    },
 
-  /**
-   * Clear all listeners
-   */
-  clear() {
-    this.listeners = Object.create(null);
-  }
-}
+    once: function(event, callback) {
+      var wrapped = function(data) {
+        EventBus.off(event, wrapped);
+        callback(data);
+      };
+      EventBus.on(event, wrapped);
+    },
 
-// Global singleton instance
-window.EventBus = new EventBus();
+    clear: function() {
+      listeners = {};
+    }
+  };
+
+  // Export to global scope
+  window.EventBus = EventBus;
+  
+  console.log('✅ EventBus initialized successfully');
+})();
