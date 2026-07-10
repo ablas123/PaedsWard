@@ -330,4 +330,4 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received, creating final backup...');
   createBackup();
   process.exit(0);
-});
+}); 
