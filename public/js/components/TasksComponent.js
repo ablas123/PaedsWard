@@ -1,137 +1,195 @@
+// CoreWard - Tasks Component
+// Task management system
+
 class TasksComponent {
   constructor() {
-    this.container = document.getElementById('appContent');
-    this.tab = 'tasks';
-    this.searchQuery = '';
-    bus.on('switchTab', (tab) => { if (tab === this.tab) this.render(); });
-    bus.on('render', () => { if (this.tab === 'tasks') this.render(); });
-    bus.on('stateChanged', () => this.render());
-    bus.on('search', (q) => { this.searchQuery = q; this.render(); });
+    this.container = document.getElementById('appMain');
+    this.bindEvents();
+  }
+
+  bindEvents() {
+    EventBus.on('stateChanged', () => this.render());
+    EventBus.on('search', (query) => this.handleSearch(query));
   }
 
   render() {
-    const state = stateManager.get();
-    const role = state.currentRole;
-    let pending = state.tasks.filter(t => !t.done);
-    let done = state.tasks.filter(t => t.done);
+    const tasks = window.stateManager.getTasks();
+    const currentUser = window.stateManager.getCurrentUser();
+    const filteredTasks = this.filterTasksByRole(tasks, currentUser.role);
 
-    if (this.searchQuery) {
-      pending = pending.filter(t => t.text.includes(this.searchQuery) || t.assignee.includes(this.searchQuery));
-      done = done.filter(t => t.text.includes(this.searchQuery) || t.assignee.includes(this.searchQuery));
-    }
-
-    let html = `
-      <div class="flex-between mb-8">
-        <h2 style="font-size:18px;">📋 المهام</h2>
-        ${hasPermission(role, 'create_task') ? `<button class="small" onclick="tasks.showAddForm()">➕ إضافة</button>` : ''}
-      </div>
-    `;
-
-    if (!pending.length) {
-      html += `<div class="empty-state"><div class="emoji">✅</div><p>${this.searchQuery ? 'لا توجد نتائج بحث' : 'لا توجد مهام معلقة'}</p></div>`;
-    } else {
-      pending.forEach(t => {
-        const isMine = t.assignee === role || role === 'director' || role === 'specialist' || role === 'deputy';
-        const isOverdue = t.dueDate && t.dueDate < today() && !t.done;
-        const isSoon = t.dueDate && t.dueDate === today() && !t.done;
-        const tagClass = isOverdue ? 'overdue' : isSoon ? 'soon' : t.priority;
-        const dueDisplay = t.dueDate ? (t.dueTime ? `${t.dueDate} ${t.dueTime}` : t.dueDate) : '';
-        html += `
-          <div class="card" style="border-right-color:${isOverdue ? 'var(--danger)' : isSoon ? 'var(--warning)' : t.priority === 'high' ? 'var(--danger)' : t.priority === 'medium' ? 'var(--warning)' : 'var(--gray)'};">
-            <div class="flex-between">
-              <span class="title" style="font-size:14px;">${t.text} ${isOverdue ? '⏰' : isSoon ? '🕐' : ''}</span>
-              <span class="tag ${tagClass}">${isOverdue ? 'متأخرة' : isSoon ? 'مستحقة قريباً' : t.priority}</span>
-            </div>
-            <div class="sub">👤 ${getRoleLabel(t.assignee)} · ${t.createdAt || ''} ${dueDisplay ? '· استحقاق: ' + dueDisplay : ''}</div>
-            ${isMine ? `<div class="actions"><button class="small" onclick="tasks.toggle('${t.id}')">✅ إنجاز</button></div>` : ''}
-          </div>
-        `;
-      });
-    }
-
-    if (done.length) {
-      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;color:var(--gray);font-size:12px;">✅ منجزة (${done.length})</summary>`;
-      done.forEach(t => {
-        html += `<div class="card" style="border-right-color:var(--success);opacity:0.5;">
-          <div class="flex-between"><span style="font-size:13px;">${t.text}</span><span class="done-badge">✓</span></div>
-        </div>`;
-      });
-      html += `</details>`;
-    }
-
-    this.container.innerHTML = html;
-  }
-
-  showAddForm() {
-    openModal(`
-      <h2>➕ إضافة مهمة جديدة</h2>
-      <label>وصف المهمة *</label><input id="taskText" placeholder="مثال: مراجعة نتائج المختبر">
-      <label>المسؤول</label>
-      <select id="taskAssignee" class="form-input">
-        <option value="director">مدير</option>
-        <option value="specialist">اختصاصي</option>
-        <option value="deputy">نائب</option>
-        <option value="general">عمومي</option>
-        <option value="intern" selected>طبيب امتياز</option>
-      </select>
-      <label>الأولوية</label>
-      <select id="taskPriority" class="form-input">
-        <option value="high">عالية</option>
-        <option value="medium" selected>متوسطة</option>
-        <option value="low">منخفضة</option>
-      </select>
-      <label>تاريخ الاستحقاق</label>
-      <input id="taskDueDate" type="date" value="${today()}">
-      <label>وقت الاستحقاق</label>
-      <input id="taskDueTime" type="time" value="${timeNow()}">
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button onclick="tasks.saveTask()">حفظ</button>
-        <button class="secondary" onclick="closeModal()">إلغاء</button>
-      </div>
-    `);
-  }
-
-  async saveTask() {
-    const text = document.getElementById('taskText').value.trim();
-    const assignee = document.getElementById('taskAssignee').value;
-    const priority = document.getElementById('taskPriority').value;
-    const dueDate = document.getElementById('taskDueDate').value || today();
-    const dueTime = document.getElementById('taskDueTime').value || timeNow();
-
-    if (!text) {
-      showToast('⚠️ وصف المهمة مطلوب', 'error');
+    if (filteredTasks.length === 0) {
+      this.container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-text">لا توجد مهام حالياً</div>
+          <button class="btn btn-primary" onclick="window.app.components.tasks.showAddForm()">
+            إنشاء مهمة جديدة
+          </button>
+        </div>
+      `;
       return;
     }
 
-    const newTask = {
-      id: 'temp_' + uid(),
-      text,
-      priority,
-      assignee,
-      done: false,
-      createdAt: today(),
-      dueDate,
-      dueTime,
-      reminded: false,
-      updatedAt: Date.now()
-    };
+    // Sort tasks: overdue first, then by due date
+    const sortedTasks = filteredTasks.sort((a, b) => {
+      const aOverdue = isTaskOverdue(a);
+      const bOverdue = isTaskOverdue(b);
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
+      return new Date(a.dueDate || '9999') - new Date(b.dueDate || '9999');
+    });
 
-    await stateManager.addItem('tasks', newTask);
-    closeModal();
-    bus.emit('render');
-    showToast('📋 تمت إضافة المهمة', 'success');
+    this.container.innerHTML = sortedTasks.map(task => this.renderTaskItem(task)).join('');
   }
 
-  async toggle(id) {
-    const state = stateManager.get();
-    const t = state.tasks.find(task => task.id === id);
-    if (!t) return;
-    const done = !t.done;
-    await stateManager.updateItem('tasks', id, { done, updatedAt: Date.now() });
-    bus.emit('render');
-    showToast(done ? '✅ تم إنجاز المهمة' : '🔄 أعيد فتح المهمة', done ? 'success' : 'warning');
+  filterTasksByRole(tasks, role) {
+    if (role === 'intern') {
+      const currentUser = window.stateManager.getCurrentUser();
+      return tasks.filter(t => t.assignee === currentUser.id);
+    }
+    return tasks;
+  }
+
+  renderTaskItem(task) {
+    const user = window.stateManager.getUserById(task.assignee);
+    const assigneeName = user ? user.name : 'غير معروف';
+    const priority = TASK_PRIORITY[task.priority] || TASK_PRIORITY.medium;
+    const isOverdue = isTaskOverdue(task);
+    const isDueSoon = isTaskDueSoon(task);
+    const completedClass = task.completed ? 'completed' : '';
+    
+    let statusText = '';
+    if (isOverdue) statusText = '⏰ متأخر';
+    else if (isDueSoon) statusText = '🕐 قريب';
+
+    return `
+      <div class="task-item ${priority.label.toLowerCase()} ${completedClass}">
+        <div class="task-check ${task.completed ? 'checked' : ''}" onclick="window.app.components.tasks.toggleTask('${task.id}', ${!task.completed})">
+          ${task.completed ? '✓' : ''}
+        </div>
+        <div class="task-content">
+          <div class="task-text">${escapeHtml(task.description)}</div>
+          <div class="task-meta">
+            <span>الموعد: ${formatDateTime(task.dueDate)}</span>
+            <span>المكلف: ${assigneeName}</span>
+            <span class="badge" style="background:${priority.color};color:white;">${priority.label}</span>
+            ${statusText ? `<span class="${isOverdue ? 'task-overdue' : 'task-soon'}">${statusText}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  showAddForm() {
+    const users = window.stateManager.getUsers();
+    const currentUser = window.stateManager.getCurrentUser();
+    
+    // Filter assignable users based on role
+    let assignableUsers = users;
+    if (currentUser.role === 'intern') {
+      // Interns can only assign to themselves
+      assignableUsers = [currentUser];
+    } else if (['general', 'specialist', 'deputy'].includes(currentUser.role)) {
+      // Can assign to interns and themselves
+      assignableUsers = users.filter(u => u.role === 'intern' || u.id === currentUser.id);
+    }
+    // Directors can assign to anyone
+
+    const userOptions = assignableUsers.map(u => 
+      `<option value="${u.id}">${getRoleEmoji(u.role)} ${u.name}</option>`
+    ).join('');
+
+    const form = `
+      <div class="form-group">
+        <label>وصف المهمة</label>
+        <input type="text" id="taskDesc" required placeholder="مثال: مراجعة تحليل الدم" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>المكلف</label>
+          <select id="taskAssignee" required>
+            <option value="">اختر...</option>
+            ${userOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>الأولوية</label>
+          <select id="taskPriority" required>
+            <option value="high">🔴 عالية</option>
+            <option value="medium" selected>🟡 متوسطة</option>
+            <option value="low">🟢 منخفضة</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>تاريخ التنفيذ</label>
+          <input type="date" id="taskDueDate" required />
+        </div>
+        <div class="form-group">
+          <label>وقت التنفيذ</label>
+          <input type="time" id="taskDueTime" />
+        </div>
+      </div>
+    `;
+
+    window.app.showModal('إنشاء مهمة جديدة', form, `
+      <button class="btn btn-secondary" onclick="window.app.components.tasks.closeModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="window.app.components.tasks.saveTask()">حفظ المهمة</button>
+    `);
+
+    // Set default date to today
+    document.getElementById('taskDueDate').valueAsDate = new Date();
+  }
+
+  async saveTask() {
+    try {
+      const description = document.getElementById('taskDesc').value;
+      const assignee = document.getElementById('taskAssignee').value;
+      const priority = document.getElementById('taskPriority').value;
+      const dueDate = document.getElementById('taskDueDate').value;
+      const dueTime = document.getElementById('taskDueTime').value;
+
+      if (!description || !assignee || !priority || !dueDate) {
+        window.app.showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
+        return;
+      }
+
+      const task = {
+        description,
+        assignee,
+        priority,
+        dueDate,
+        dueTime: dueTime || null,
+        completed: false
+      };
+
+      await window.stateManager.addItem('tasks', task);
+      window.app.showToast('تم إنشاء المهمة بنجاح!', 'success');
+      window.app.components.tasks.closeModal();
+    } catch (err) {
+      console.error('Task save error:', err);
+      window.app.showToast('فشل الحفظ: ' + (err.message || ''), 'error');
+    }
+  }
+
+  async toggleTask(id, completed) {
+    try {
+      await window.stateManager.updateItem('tasks', id, { completed });
+      // Auto-refresh
+    } catch (err) {
+      console.error('Task toggle error:', err);
+      window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
+    }
+  }
+
+  closeModal() {
+    document.getElementById('modalContainer').classList.remove('active');
+    setTimeout(() => document.getElementById('modalContainer').innerHTML = '', 300);
+  }
+
+  handleSearch(query) {
+    if (!query) return;
+    // This will be handled by the main render
   }
 }
-
-const tasks = new TasksComponent();
-window.tasks = tasks;
