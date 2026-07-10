@@ -1,5 +1,5 @@
 /* ============================================
-   CoreWard Design System
+   CoreWard Design System (Complete + Enhanced)
    RTL-first, Mobile-first, Offline-ready
    ============================================ */
 
@@ -230,10 +230,16 @@ a { color: var(--primary); text-decoration: none; }
 .status-dot.online {
   background: var(--success);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+  animation: statusPulse 2s infinite;
 }
 
 .status-dot.offline {
   background: var(--danger);
+}
+
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.1); }
 }
 
 .icon-btn {
@@ -335,6 +341,12 @@ a { color: var(--primary); text-decoration: none; }
   justify-content: center;
   padding: 0 4px;
   font-weight: 700;
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: translateX(100%) scale(1); }
+  50% { transform: translateX(100%) scale(1.1); }
 }
 
 /* ============ Main Content ============ */
@@ -518,7 +530,10 @@ a { color: var(--primary); text-decoration: none; }
 }
 
 /* Card Variants */
-.card.critical { border-right-color: var(--danger); background: linear-gradient(to left, var(--danger-light) 0%, white 40%); }
+.card.critical { 
+  border-right-color: var(--danger); 
+  background: linear-gradient(to left, var(--danger-light) 0%, white 30%); 
+}
 .card.warning { border-right-color: var(--warning); }
 .card.success { border-right-color: var(--success); }
 .card.info { border-right-color: var(--info); }
@@ -557,6 +572,11 @@ a { color: var(--primary); text-decoration: none; }
   text-align: center;
   box-shadow: var(--shadow-sm);
   border-top: 3px solid var(--primary);
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
 }
 
 .stat-card.success { border-top-color: var(--success); }
@@ -682,6 +702,10 @@ a { color: var(--primary); text-decoration: none; }
   padding: 16px;
 }
 
+.modal-body .form-group:last-child {
+  margin-bottom: 0;
+}
+
 .modal-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -746,10 +770,32 @@ a { color: var(--primary); text-decoration: none; }
   box-shadow: var(--shadow-lg);
   z-index: 80;
   transition: var(--transition);
+  position: relative;
 }
 
 .fab:hover { background: var(--primary-dark); transform: scale(1.05); }
 .fab:active { transform: scale(0.95); }
+
+.fab::before {
+  content: attr(title);
+  position: absolute;
+  right: 70px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--gray-800);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.fab:hover::before {
+  opacity: 1;
+}
 
 /* ============ Tabs (Inner) ============ */
 .tabs {
@@ -1201,15 +1247,39 @@ a { color: var(--primary); text-decoration: none; }
   .app-header, .app-nav, .search-bar, .fab, .icon-btn, .btn { display: none !important; }
   .app-main { padding: 0; }
   .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+  .card.critical {
+    border: 2px solid var(--danger);
+  }
 }
 
 /* ============ Responsive ============ */
 @media (max-width: 500px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 8px;
+  }
   .vitals-grid { grid-template-columns: repeat(3, 1fr); }
   .form-row { grid-template-columns: 1fr; }
   .nav-tab { min-width: 64px; font-size: 9px; }
   .nav-tab .tab-icon { font-size: 18px; }
+  
+  .stat-value {
+    font-size: 22px;
+  }
+  
+  .stat-label {
+    font-size: 10px;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .section-header .btn {
+    width: 100%;
+  }
 }
 
 @media (min-width: 600px) {
@@ -1242,3 +1312,10 @@ a { color: var(--primary); text-decoration: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+/* ============ Search highlight ============ */
+.search-highlight {
+  background: var(--warning-light);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
