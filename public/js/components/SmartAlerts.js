@@ -24,21 +24,36 @@ class SmartAlerts {
     const unreadCount = userAlerts.filter(a => !a.read).length;
 
     this.container.innerHTML = `
-      <div class="section-header">
-        <div class="section-title">🔔 التنبيهات (${userAlerts.length})</div>
-        ${hasPermission(currentUser.role, 'add_alert') ? `
-          <button class="btn btn-primary" onclick="window.app.components.alerts.showAddForm()">+ تنبيه جديد</button>
-        ` : ''}
-      </div>
-      
-      ${unreadCount > 0 ? `
-        <div class="card info mb-3">
-          <div class="card-body">
-            <strong>📬 لديك ${unreadCount} تنبيه(ات) غير مقروءة</strong>
-            <button class="btn btn-sm btn-primary" style="margin-right:10px;" onclick="window.app.components.alerts.markAllRead()">تحديد الكل كمقروء</button>
-          </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${userAlerts.length}</div>
+          <div class="stat-label">إجمالي التنبيهات</div>
         </div>
-      ` : ''}
+        <div class="stat-card warning">
+          <div class="stat-value">${unreadCount}</div>
+          <div class="stat-label">غير مقروءة</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-value">${userAlerts.length - unreadCount}</div>
+          <div class="stat-label">مقروءة</div>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-value">${alerts.filter(a => !a.targetIntern && !a.targetRole).length}</div>
+          <div class="stat-label">عامة</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">🔔 التنبيهات</div>
+        <div class="flex gap-2">
+          ${unreadCount > 0 ? `
+            <button class="btn btn-sm btn-secondary" onclick="window.app.components.alerts.markAllRead()">✓ تحديد الكل كمقروء</button>
+          ` : ''}
+          ${hasPermission(currentUser.role, 'add_alert') ? `
+            <button class="btn btn-sm btn-primary" onclick="window.app.components.alerts.showAddForm()">+ تنبيه جديد</button>
+          ` : ''}
+        </div>
+      </div>
 
       ${userAlerts.length > 0 ? userAlerts.map(alert => this.renderAlert(alert)).join('') : `
         <div class="empty-state">
@@ -50,23 +65,26 @@ class SmartAlerts {
   }
 
   renderAlert(alert) {
-    const readClass = alert.read ? '' : 'info';
+    const isUrgent = alert.title && (alert.title.includes('🚨') || alert.title.includes('⏰'));
+    const cardClass = alert.read ? '' : (isUrgent ? 'critical' : 'info');
     
     return `
-      <div class="card ${readClass}">
+      <div class="card ${cardClass}">
         <div class="card-header">
           <div class="card-title">${escapeHtml(alert.title)}</div>
           <div class="badge ${alert.read ? 'badge-gray' : 'badge-primary'}">
-            ${alert.read ? 'مقروء' : 'جديد'}
+            ${alert.read ? '✓ مقروء' : '● جديد'}
           </div>
         </div>
         <div class="card-body">
           <div>${escapeHtml(alert.message)}</div>
-          <div class="text-muted text-sm mt-2">${formatDateTime(alert.createdAt)}</div>
+          <div class="text-muted text-sm mt-2">
+            ${formatDateTime(alert.createdAt)} • ${timeAgo(alert.createdAt)}
+          </div>
         </div>
         ${!alert.read ? `
           <div class="card-footer">
-            <button class="btn btn-sm btn-primary" onclick="window.app.components.alerts.markRead('${alert.id}')">تحديد كمقروء</button>
+            <button class="btn btn-sm btn-primary" onclick="window.app.components.alerts.markRead('${alert.id}')">✓ تحديد كمقروء</button>
           </div>
         ` : ''}
       </div>
@@ -77,13 +95,14 @@ class SmartAlerts {
     const users = window.stateManager.getUsers();
     const currentUser = window.stateManager.getCurrentUser();
     
-    const roleOptions = Object.keys(ROLES).map(role => 
-      `<option value="${role}">${getRoleEmoji(role)} ${getRoleLabel(role)}</option>`
-    ).join('');
+    const roleOptions = Object.keys(ROLES)
+      .filter(r => r !== currentUser.role)
+      .map(role => `<option value="role:${role}">${getRoleEmoji(role)} جميع ${getRoleLabel(role)}</option>`)
+      .join('');
 
     const userOptions = users
       .filter(u => u.id !== currentUser.id)
-      .map(u => `<option value="${u.id}">${getRoleEmoji(u.role)} ${u.name}</option>`)
+      .map(u => `<option value="user:${u.id}">${getRoleEmoji(u.role)} ${u.name}</option>`)
       .join('');
 
     const form = `
@@ -96,9 +115,9 @@ class SmartAlerts {
         <textarea id="alertMessage" rows="3" required placeholder="تفاصيل التنبيه..."></textarea>
       </div>
       <div class="form-group">
-        <label>إرسال إلى (اختياري)</label>
+        <label>إرسال إلى</label>
         <select id="alertTarget">
-          <option value="">الكل</option>
+          <option value="all">📢 الجميع</option>
           <optgroup label="حسب الدور">
             ${roleOptions}
           </optgroup>
@@ -117,8 +136,8 @@ class SmartAlerts {
 
   async saveAlert() {
     try {
-      const title = document.getElementById('alertTitle').value;
-      const message = document.getElementById('alertMessage').value;
+      const title = document.getElementById('alertTitle').value.trim();
+      const message = document.getElementById('alertMessage').value.trim();
       const target = document.getElementById('alertTarget').value;
 
       if (!title || !message) {
@@ -129,17 +148,16 @@ class SmartAlerts {
       let targetRole = null;
       let targetIntern = null;
 
-      if (target) {
-        if (ROLES[target]) {
-          targetRole = target;
-        } else {
-          targetIntern = target;
-        }
+      if (target.startsWith('role:')) {
+        targetRole = target.substring(5);
+      } else if (target.startsWith('user:')) {
+        targetIntern = target.substring(5);
       }
+      // 'all' means both null
 
       await window.stateManager.addAlert(title, message, targetRole, targetIntern);
       window.app.showToast('تم إرسال التنبيه!', 'success');
-      window.app.components.alerts.closeModal();
+      this.closeModal();
     } catch (err) {
       console.error('Alert save error:', err);
       window.app.showToast('فشل الإرسال: ' + (err.message || ''), 'error');
@@ -150,6 +168,8 @@ class SmartAlerts {
     try {
       await window.stateManager.updateItem('alerts', id, { read: true });
       window.app.showToast('تم تحديد التنبيه كمقروء!', 'success');
+      // Re-render to update badge
+      window.app.renderTabs();
     } catch (err) {
       console.error('Mark read error:', err);
       window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
@@ -172,7 +192,8 @@ class SmartAlerts {
         await window.stateManager.updateItem('alerts', alert.id, { read: true });
       }
 
-      window.app.showToast('تم تحديد جميع التنبيهات كمقروءة!', 'success');
+      window.app.showToast(`تم تحديد ${unreadAlerts.length} تنبيه(ات) كمقروءة!`, 'success');
+      window.app.renderTabs();
     } catch (err) {
       console.error('Mark all read error:', err);
       window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
