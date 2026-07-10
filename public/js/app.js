@@ -1,4 +1,4 @@
-// CoreWard - Application Entry Point (Fixed + Enhanced)
+// CoreWard - Application Entry Point (Complete + Fixed)
 
 class App {
   constructor() {
@@ -171,7 +171,6 @@ class App {
       const isActive = tab.id === this.currentTab;
       let badgeHtml = '';
       
-      // Add badge for alerts tab
       if (tab.id === 'alerts') {
         const unreadCount = this.getUnreadAlertsCount();
         if (unreadCount > 0) {
@@ -179,7 +178,6 @@ class App {
         }
       }
       
-      // Add badge for tasks tab
       if (tab.id === 'tasks') {
         const pendingCount = this.getPendingTasksCount();
         if (pendingCount > 0) {
@@ -334,8 +332,8 @@ class App {
     this.stopAlertChecking();
     this.alertCheckInterval = setInterval(() => {
       this.checkSmartAlerts();
-      this.renderTabs(); // Update badges
-    }, 60000); // Check every minute
+      this.renderTabs();
+    }, 60000);
   }
 
   stopAlertChecking() {
@@ -353,32 +351,43 @@ class App {
     const tasks = window.stateManager.getTasks();
     tasks.forEach(task => {
       if (task.completed || task.alertSent) return;
-      if (isTaskOverdue(task)) {
-        if (task.assignee === currentUser.id || currentUser.role === 'director') {
-          window.stateManager.addAlert(
-            '⏰ مهمة متأخرة',
-            `المهمة "${task.description}" متأخرة عن موعدها`,
-            null,
-            task.assignee
-          );
-          task.alertSent = true;
-        }
+      if (!isTaskOverdue(task)) return;
+      
+      if (task.assignee === currentUser.id || currentUser.role === 'director') {
+        task.alertSent = true;
+        
+        window.stateManager.addAlert(
+          '⏰ مهمة متأخرة',
+          `المهمة "${task.description}" متأخرة عن موعدها`,
+          null,
+          task.assignee
+        ).catch(err => {
+          console.error('Alert creation failed:', err);
+          task.alertSent = false;
+        });
       }
     });
 
     // Check critical patients
     const patients = window.stateManager.getPatients();
     patients.forEach(patient => {
-      if (patient.status === 'critical' && !patient.alertSent) {
-        window.stateManager.addAlert(
-          '🚨 حالة حرجة',
-          `المريض ${patient.name} في حالة حرجة`,
-          null,
-          null
-        );
-        patient.alertSent = true;
-      }
+      if (patient.status !== 'critical' || patient.criticalAlertSent) return;
+      if (patient.status === 'discharged') return;
+      
+      patient.criticalAlertSent = true;
+      
+      window.stateManager.addAlert(
+        '🚨 حالة حرجة',
+        `المريض ${patient.name} في حالة حرجة - السرير ${patient.bed || 'غير محدد'}`,
+        null,
+        null
+      ).catch(err => {
+        console.error('Critical alert failed:', err);
+        patient.criticalAlertSent = false;
+      });
     });
+
+    this.renderTabs();
   }
 }
 
