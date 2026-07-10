@@ -1,4 +1,4 @@
-// CoreWard - EventBus (Simplified + Fixed)
+// CoreWard - EventBus
 // Pub/Sub pattern for component communication
 
 (function() {
@@ -8,18 +8,9 @@
 
   var EventBus = {
     on: function(event, callback) {
-      if (typeof callback !== 'function') {
-        throw new TypeError('EventBus.on: callback must be a function');
-      }
-      if (!listeners[event]) {
-        listeners[event] = [];
-      }
+      if (typeof callback !== 'function') return;
+      if (!listeners[event]) listeners[event] = [];
       listeners[event].push(callback);
-      
-      // Return unsubscribe function
-      return function() {
-        EventBus.off(event, callback);
-      };
     },
 
     off: function(event, callback) {
@@ -31,9 +22,6 @@
       listeners[event] = listeners[event].filter(function(cb) {
         return cb !== callback;
       });
-      if (listeners[event].length === 0) {
-        delete listeners[event];
-      }
     },
 
     emit: function(event, data) {
@@ -43,26 +31,21 @@
         try {
           handlers[i](data);
         } catch (err) {
-          console.error('[EventBus] Error in handler for "' + event + '":', err);
+          console.error('[EventBus] Error:', err);
         }
       }
     },
 
     once: function(event, callback) {
+      var self = this;
       var wrapped = function(data) {
-        EventBus.off(event, wrapped);
+        self.off(event, wrapped);
         callback(data);
       };
-      EventBus.on(event, wrapped);
-    },
-
-    clear: function() {
-      listeners = {};
+      this.on(event, wrapped);
     }
   };
 
-  // Export to global scope
   window.EventBus = EventBus;
-  
-  console.log('✅ EventBus initialized successfully');
+  console.log('[CoreWard] ✅ EventBus loaded');
 })();
