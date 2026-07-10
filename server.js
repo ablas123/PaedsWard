@@ -1,5 +1,4 @@
-// CoreWard - Backend Server (Fixed Version)
-// Node.js + Express + File-based JSON Storage
+// CoreWard - Backend Server (Fixed: Permissions)
 
 const express = require('express');
 const cors = require('cors');
@@ -12,17 +11,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'database.json');
 const BACKUP_DIR = path.join(__dirname, 'backups');
-const BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const MAX_BACKUPS = 10;
 
-// ============ Middleware ============
 app.use(cors());
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ============ Default Data ============
 const DEFAULT_DATA = {
   users: [
     {
@@ -45,7 +42,6 @@ const DEFAULT_DATA = {
   syncQueue: []
 };
 
-// ============ Roles & Permissions ============
 const ROLES = {
   director: ['manage_users', 'manage_patients', 'manage_tasks', 'manage_handovers', 'add_alert', 'view_reports', 'view_audit', 'manage_clinic', 'manage_team', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'admit_patients', 'view_patients', 'view_assigned_patients', 'create_handovers', 'complete_tasks'],
   specialist: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports', 'view_assigned_patients', 'create_handovers'],
@@ -59,7 +55,6 @@ function hasPermission(role, permission) {
   return perms.includes(permission);
 }
 
-// ============ Database Helpers ============
 function readDB() {
   try {
     if (!fs.existsSync(DB_PATH)) {
@@ -68,7 +63,6 @@ function readDB() {
     }
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
     const data = JSON.parse(raw);
-    // Ensure all collections exist
     Object.keys(DEFAULT_DATA).forEach(key => {
       if (!data[key]) data[key] = JSON.parse(JSON.stringify(DEFAULT_DATA[key]));
     });
@@ -98,7 +92,6 @@ function sanitizeUser(user) {
   return rest;
 }
 
-// ============ Validation Helpers ============
 function isPositiveNumber(value) {
   const num = Number(value);
   return !isNaN(num) && num > 0 && isFinite(num);
@@ -108,7 +101,6 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// ============ Audit Log ============
 function addAuditLog(user, action, details) {
   const db = readDB();
   const entry = {
@@ -126,7 +118,6 @@ function addAuditLog(user, action, details) {
   return entry;
 }
 
-// ============ Backup System ============
 function ensureBackupDir() {
   if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -157,7 +148,6 @@ function createBackup() {
   }
 }
 
-// ============ Auth Middleware ============
 function authMiddleware(req, res, next) {
   const userId = req.headers['x-user-id'];
   const userRole = req.headers['x-user-role'];
@@ -172,14 +162,10 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// ============ API Routes ============
-
-// Ping (keep-alive for Render free tier)
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Login
 app.post('/api/login', (req, res) => {
   try {
     const { email, password } = req.body;
@@ -201,7 +187,6 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Get full state (for sync) - FIXED
 app.get('/api/state', authMiddleware, (req, res) => {
   try {
     const db = readDB();
@@ -222,7 +207,6 @@ app.get('/api/state', authMiddleware, (req, res) => {
   }
 });
 
-// Sync (receive client changes)
 app.post('/api/sync', authMiddleware, (req, res) => {
   try {
     const { collection, action, item, id, updates } = req.body;
@@ -235,16 +219,17 @@ app.post('/api/sync', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'Invalid collection' });
     }
 
-    // Permission check
+    // FIXED: Improved permission checking
     const permMap = {
-      patients: 'manage_patients',
-      tasks: 'manage_tasks',
-      handovers: 'manage_handovers',
-      clinicSlots: 'manage_clinic',
-      teamMessages: 'manage_team',
-      alerts: 'add_alert'
+      patients: { add: 'admit_patients', update: 'manage_patients', delete: 'manage_patients' },
+      tasks: { add: 'create_tasks', update: 'complete_tasks', delete: 'manage_tasks' },
+      handovers: { add: 'create_handovers', update: 'manage_handovers', delete: 'manage_handovers' },
+      clinicSlots: { add: 'manage_clinic', update: 'manage_clinic', delete: 'manage_clinic' },
+      teamMessages: { add: 'manage_team', update: 'manage_team', delete: 'manage_team' },
+      alerts: { add: 'add_alert', update: 'add_alert', delete: 'add_alert' }
     };
-    const requiredPerm = permMap[collection];
+
+    const requiredPerm = permMap[collection]?.[action];
     if (requiredPerm && !hasPermission(req.user.role, requiredPerm)) {
       return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
     }
@@ -273,7 +258,6 @@ app.post('/api/sync', authMiddleware, (req, res) => {
       const idx = db[collection].findIndex(x => x.id === id);
       if (idx === -1) return res.status(404).json({ error: 'Item not found' });
 
-      // Conflict resolution: server wins if newer
       const serverTime = new Date(db[collection][idx].updatedAt || 0).getTime();
       const clientTime = new Date(updates.updatedAt || 0).getTime();
 
@@ -283,7 +267,7 @@ app.post('/api/sync', authMiddleware, (req, res) => {
         db[collection][idx] = {
           ...db[collection][idx],
           ...updates,
-          id: id, // prevent id override
+          id: id,
           updatedAt: now,
           updatedBy: req.user.id
         };
@@ -309,7 +293,6 @@ app.post('/api/sync', authMiddleware, (req, res) => {
   }
 });
 
-// Create user (Director only)
 app.post('/api/users', authMiddleware, (req, res) => {
   try {
     if (!hasPermission(req.user.role, 'manage_users')) {
@@ -353,13 +336,11 @@ app.post('/api/users', authMiddleware, (req, res) => {
   }
 });
 
-// List users
 app.get('/api/users', authMiddleware, (req, res) => {
   const db = readDB();
   res.json((db.users || []).map(sanitizeUser));
 });
 
-// Delete user (Director only)
 app.delete('/api/users/:id', authMiddleware, (req, res) => {
   try {
     if (!hasPermission(req.user.role, 'manage_users')) {
@@ -382,12 +363,10 @@ app.delete('/api/users/:id', authMiddleware, (req, res) => {
   }
 });
 
-// Catch-all for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ============ Start Server ============
 app.listen(PORT, () => {
   console.log('\n🏥 CoreWard Server is running');
   console.log(`🌐 URL: http://localhost:${PORT}`);
