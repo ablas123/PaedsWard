@@ -1,4 +1,4 @@
-// CoreWard - User Management Component (Director only)
+// CoreWard - User Management Component (Fixed: no duplicates)
 
 class UserManagement {
   constructor() {
@@ -25,9 +25,24 @@ class UserManagement {
 
     const users = window.stateManager.getUsers();
     
+    // Stats
+    const roleCounts = {};
+    Object.keys(ROLES).forEach(role => {
+      roleCounts[role] = users.filter(u => u.role === role).length;
+    });
+
     this.container.innerHTML = `
+      <div class="stats-grid">
+        ${Object.keys(ROLES).map(role => `
+          <div class="stat-card" style="border-top-color:${getRoleColor(role)};">
+            <div class="stat-value">${roleCounts[role] || 0}</div>
+            <div class="stat-label">${getRoleEmoji(role)} ${getRoleLabel(role)}</div>
+          </div>
+        `).join('')}
+      </div>
+
       <div class="section-header">
-        <div class="section-title">👥 إدارة المستخدمين (${users.length})</div>
+        <div class="section-title">👥 جميع المستخدمين (${users.length})</div>
         <button class="btn btn-primary" onclick="window.app.components.users.showAddForm()">+ إضافة مستخدم</button>
       </div>
       ${users.map(user => this.renderUser(user, currentUser.id)).join('')}
@@ -42,7 +57,7 @@ class UserManagement {
         <div class="card-header">
           <div>
             <div class="card-title">${getRoleEmoji(user.role)} ${escapeHtml(user.name)}</div>
-            <div class="card-subtitle">${user.email}</div>
+            <div class="card-subtitle">${escapeHtml(user.email)}</div>
           </div>
           <div class="badge" style="background:${getRoleColor(user.role)};color:white;">${getRoleLabel(user.role)}</div>
         </div>
@@ -52,7 +67,7 @@ class UserManagement {
         </div>
         ${!isCurrentUser ? `
           <div class="card-footer">
-            <button class="btn btn-sm btn-danger" onclick="window.app.components.users.deleteUser('${user.id}')">حذف</button>
+            <button class="btn btn-sm btn-danger" onclick="window.app.components.users.deleteUser('${user.id}', '${escapeHtml(user.name)}')">حذف</button>
           </div>
         ` : ''}
       </div>
@@ -93,8 +108,8 @@ class UserManagement {
 
   async saveUser() {
     try {
-      const name = document.getElementById('userName').value;
-      const email = document.getElementById('userEmail').value;
+      const name = document.getElementById('userName').value.trim();
+      const email = document.getElementById('userEmail').value.trim();
       const password = document.getElementById('userPassword').value;
       const role = document.getElementById('userRole').value;
 
@@ -103,12 +118,18 @@ class UserManagement {
         return;
       }
 
+      if (password.length < 4) {
+        window.app.showToast('كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+        return;
+      }
+
+      const currentUser = window.stateManager.getCurrentUser();
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': window.stateManager.getCurrentUser().id,
-          'x-user-role': window.stateManager.getCurrentUser().role
+          'x-user-id': currentUser.id,
+          'x-user-role': currentUser.role
         },
         body: JSON.stringify({ name, email, password, role })
       });
@@ -116,26 +137,27 @@ class UserManagement {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create user');
 
-      // Add to local state
-      await window.stateManager.addItem('users', data.user);
+      // FIXED: Don't add to local state manually. Just sync from server.
+      await window.stateManager.syncFullState();
       
       window.app.showToast('تم إنشاء المستخدم بنجاح!', 'success');
-      window.app.components.users.closeModal();
+      this.closeModal();
     } catch (err) {
       console.error('User save error:', err);
       window.app.showToast('فشل الحفظ: ' + (err.message || ''), 'error');
     }
   }
 
-  async deleteUser(id) {
-    if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+  async deleteUser(id, name) {
+    if (!confirm(`هل أنت متأكد من حذف المستخدم "${name}"؟`)) return;
 
     try {
+      const currentUser = window.stateManager.getCurrentUser();
       const response = await fetch(`/api/users/${id}`, {
         method: 'DELETE',
         headers: {
-          'x-user-id': window.stateManager.getCurrentUser().id,
-          'x-user-role': window.stateManager.getCurrentUser().role
+          'x-user-id': currentUser.id,
+          'x-user-role': currentUser.role
         }
       });
 
@@ -144,7 +166,9 @@ class UserManagement {
         throw new Error(data.error || 'Failed to delete user');
       }
 
-      await window.stateManager.deleteItem('users', id);
+      // FIXED: Don't delete from local state manually. Just sync from server.
+      await window.stateManager.syncFullState();
+      
       window.app.showToast('تم حذف المستخدم!', 'success');
     } catch (err) {
       console.error('User delete error:', err);
