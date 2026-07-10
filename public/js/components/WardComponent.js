@@ -1,4 +1,4 @@
-// CoreWard - Ward Component (Complete + Enhanced)
+// CoreWard - Ward Component (Complete + Fixed)
 // Patient management with Vitals History + Growth Charts
 
 class WardComponent {
@@ -189,9 +189,13 @@ class WardComponent {
   }
 
   suggestDiagnosis() {
-    const symptoms = document.getElementById('admitSymptoms')?.value || '';
-    const suggestions = suggestDiagnoses(symptoms);
+    const symptomsEl = document.getElementById('admitSymptoms');
     const suggestionsEl = document.getElementById('diagnosisSuggestions');
+    
+    if (!symptomsEl || !suggestionsEl) return;
+    
+    const symptoms = symptomsEl.value || '';
+    const suggestions = suggestDiagnoses(symptoms);
     
     if (suggestions.length > 0) {
       suggestionsEl.innerHTML = `
@@ -251,7 +255,7 @@ class WardComponent {
       const meds = document.getElementById('admitMeds').value;
       const allergies = document.getElementById('admitAllergies').value;
       const chronic = document.getElementById('admitChronic').value;
-      const notes = document.getElementById('admitNotes').value;
+      const additionalNotes = document.getElementById('admitNotes').value;
 
       const vitals = {};
       const hr = document.getElementById('admitHr').value;
@@ -267,6 +271,18 @@ class WardComponent {
       const currentUser = window.stateManager.getCurrentUser();
       const assignedIntern = currentUser.role === 'intern' ? currentUser.id : null;
 
+      // FIXED: notes should be an array, not a string
+      const notes = [];
+      if (additionalNotes && additionalNotes.trim()) {
+        notes.push({
+          text: additionalNotes.trim(),
+          timestamp: new Date().toISOString(),
+          authorId: currentUser.id,
+          authorName: currentUser.name,
+          authorRole: currentUser.role
+        });
+      }
+
       const patient = {
         name,
         age,
@@ -277,7 +293,7 @@ class WardComponent {
         meds: meds || '',
         allergies: allergies || '',
         chronic: chronic || '',
-        notes: notes || '',
+        notes: notes, // FIXED: array instead of string
         status: 'stable',
         vitals,
         vitalsHistory: vitals.hr || vitals.spo2 || vitals.temp || vitals.rr ? [{
@@ -406,7 +422,6 @@ class WardComponent {
       }
     });
 
-    // Vitals History Chart
     let chartHtml = '';
     if (vitalsHistory.length > 1) {
       chartHtml = this.renderVitalsChart(vitalsHistory);
@@ -508,9 +523,20 @@ class WardComponent {
     `;
 
     window.app.showModal('تحديث العلامات الحيوية', form, `
-      <button class="btn btn-secondary" onclick="window.app.components.ward.closeModal()">إلغاء</button>
+      <button class="btn btn-secondary" onclick="window.app.components.ward.closeVitalsModal('${id}')">إلغاء</button>
       <button class="btn btn-primary" onclick="window.app.components.ward.saveVitals('${id}')">حفظ</button>
     `);
+  }
+
+  // FIXED: New method to close vitals modal and return to patient view
+  closeVitalsModal(patientId) {
+    const container = document.getElementById('modalContainer');
+    container.classList.remove('active');
+    setTimeout(() => {
+      container.innerHTML = '';
+      // Return to patient view
+      this.viewPatient(patientId);
+    }, 300);
   }
 
   async saveVitals(id) {
@@ -533,7 +559,6 @@ class WardComponent {
       if (rr) vitals.rr = parseInt(rr);
       if (bp) vitals.bp = bp;
 
-      // Add to vitals history
       const vitalsHistory = [...(patient.vitalsHistory || [])];
       if (hr || spo2 || temp || rr) {
         vitalsHistory.push({
@@ -543,7 +568,6 @@ class WardComponent {
         });
       }
 
-      // Add to weight history
       const weightHistory = [...(patient.weightHistory || [])];
       if (weight) {
         weightHistory.push({
@@ -561,7 +585,14 @@ class WardComponent {
       });
       
       window.app.showToast('تم تحديث العلامات الحيوية!', 'success');
-      this.closeModal();
+      
+      // FIXED: Close modal and return to patient view
+      const container = document.getElementById('modalContainer');
+      container.classList.remove('active');
+      setTimeout(() => {
+        container.innerHTML = '';
+        this.viewPatient(id);
+      }, 300);
     } catch (err) {
       console.error('Vitals update error:', err);
       window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
@@ -597,12 +628,10 @@ class WardComponent {
         <div class="card-title">📊 منحنى الوزن</div>
         <div class="card-body">
           <svg viewBox="0 0 100 100" style="width:100%;height:200px;background:var(--gray-50);border-radius:8px;">
-            <!-- Reference curves (simulated) -->
             <polyline points="0,80 100,20" fill="none" stroke="var(--success)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
             <polyline points="0,90 100,40" fill="none" stroke="var(--warning)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
             <polyline points="0,95 100,60" fill="none" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
             
-            <!-- Actual weight curve -->
             <polyline points="${points}" fill="none" stroke="var(--primary)" stroke-width="2.5" />
             ${sorted.map((w, i) => {
               const x = (i / (sorted.length - 1)) * 100;
@@ -640,6 +669,10 @@ class WardComponent {
       const meds = document.getElementById('editMeds').value;
       await window.stateManager.updateItem('patients', id, { meds });
       window.app.showToast('تم حفظ الأدوية!', 'success');
+      
+      // FIXED: Re-render the meds tab
+      const patient = window.stateManager.getPatientById(id);
+      document.getElementById('patientContent').innerHTML = this.renderPatientMeds(patient);
     } catch (err) {
       console.error('Meds save error:', err);
       window.app.showToast('فشل الحفظ: ' + (err.message || ''), 'error');
@@ -656,7 +689,8 @@ class WardComponent {
       </div>
     ` : '';
 
-    const notes = patient.notes || [];
+    // FIXED: Ensure notes is an array
+    const notes = Array.isArray(patient.notes) ? patient.notes : [];
     const notesHtml = notes.length > 0 ? notes.map(note => `
       <div class="timeline-item">
         <div class="timeline-date">${formatDateTime(note.timestamp)}</div>
@@ -693,10 +727,15 @@ class WardComponent {
       };
 
       const patient = window.stateManager.getPatientById(id);
-      const notes = [...(patient.notes || []), note];
-      await window.stateManager.updateItem('patients', id, { notes });
+      // FIXED: Ensure notes is an array
+      const notes = Array.isArray(patient.notes) ? patient.notes : [];
+      const updatedNotes = [...notes, note];
+      
+      await window.stateManager.updateItem('patients', id, { notes: updatedNotes });
       window.app.showToast('تمت إضافة الملاحظة!', 'success');
-      document.getElementById('newNote').value = '';
+      
+      // FIXED: Re-render the notes tab
+      document.getElementById('patientContent').innerHTML = this.renderPatientNotes(patient);
     } catch (err) {
       console.error('Note add error:', err);
       window.app.showToast('فشل الإضافة: ' + (err.message || ''), 'error');
@@ -776,10 +815,8 @@ class WardComponent {
       await window.stateManager.updateItem('patients', id, { soap });
       window.app.showToast('تم حفظ SOAP!', 'success');
       
-      document.getElementById('soapS').value = '';
-      document.getElementById('soapO').value = '';
-      document.getElementById('soapA').value = '';
-      document.getElementById('soapP').value = '';
+      // FIXED: Re-render the SOAP tab
+      document.getElementById('patientContent').innerHTML = this.renderPatientSoap(patient);
     } catch (err) {
       console.error('SOAP add error:', err);
       window.app.showToast('فشل الحفظ: ' + (err.message || ''), 'error');
