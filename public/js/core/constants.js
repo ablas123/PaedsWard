@@ -1,7 +1,5 @@
-// CoreWard - Constants & Configuration
-// Roles, permissions, tabs, and shared constants
+// CoreWard - Constants & Configuration (Updated: new tabs)
 
-// ============ Roles & Permissions ============
 const ROLES = {
   director: {
     label: 'مدير',
@@ -52,37 +50,25 @@ const ROLES = {
   }
 };
 
-/**
- * Check if a role has a specific permission
- */
 function hasPermission(role, permission) {
   const roleData = ROLES[role];
   if (!roleData) return false;
   return roleData.permissions.includes(permission);
 }
 
-/**
- * Get Arabic label for a role
- */
 function getRoleLabel(role) {
   return ROLES[role]?.label || role;
 }
 
-/**
- * Get emoji for a role
- */
 function getRoleEmoji(role) {
   return ROLES[role]?.emoji || '👤';
 }
 
-/**
- * Get color for a role
- */
 function getRoleColor(role) {
   return ROLES[role]?.color || '#64748b';
 }
 
-// ============ Navigation Tabs ============
+// UPDATED: Added 'users' and 'alerts' tabs
 const TABS = [
   { id: 'dashboard', icon: '📊', label: 'الرئيسية', permission: null },
   { id: 'ward',      icon: '🛏️', label: 'العنبر',  permission: 'view_patients' },
@@ -90,24 +76,23 @@ const TABS = [
   { id: 'clinic',    icon: '🏥', label: 'العيادة', permission: 'manage_clinic' },
   { id: 'handover',  icon: '📋', label: 'التسليم', permission: null },
   { id: 'team',      icon: '💬', label: 'الفريق',  permission: null },
+  { id: 'alerts',    icon: '🔔', label: 'التنبيهات', permission: null },
+  { id: 'users',     icon: '👥', label: 'المستخدمون', permission: 'manage_users' },
   { id: 'audit',     icon: '📝', label: 'السجل',   permission: 'view_audit' }
 ];
 
-// ============ Patient Status ============
 const PATIENT_STATUS = {
   stable:    { label: 'مستقر',    emoji: '✅', color: '#22c55e', class: 'stable' },
   followup:  { label: 'تحت المراقبة', emoji: '👁️', color: '#f59e0b', class: 'followup' },
   critical:  { label: 'حرج',      emoji: '🚨', color: '#e53935', class: 'critical' }
 };
 
-// ============ Task Priority ============
 const TASK_PRIORITY = {
   high:   { label: 'عالية', emoji: '🔴', color: '#e53935' },
   medium: { label: 'متوسطة', emoji: '🟡', color: '#f59e0b' },
   low:    { label: 'منخفضة', emoji: '🟢', color: '#22c55e' }
 };
 
-// ============ Vitals Normal Ranges (Pediatric) ============
 const VITALS_RANGES = {
   hr:   { min: 70,  max: 150, unit: 'نبضة/د', label: 'النبض' },
   spo2: { min: 94,  max: 100, unit: '%',      label: 'التشبع' },
@@ -116,7 +101,6 @@ const VITALS_RANGES = {
   bp:   { min: 80,  max: 120, unit: 'mmHg',   label: 'الضغط' }
 };
 
-// ============ Default Users (fallback) ============
 const DEFAULT_USERS = [
   {
     id: 'u_admin',
@@ -126,7 +110,6 @@ const DEFAULT_USERS = [
   }
 ];
 
-// ============ Diagnosis Suggestions (Simulated AI) ============
 const DIAGNOSIS_SUGGESTIONS = {
   'حمى': ['التهاب فيروسي', 'التهاب بكتيري', 'إنفلونزا'],
   'سعال': ['التهاب شعبي', 'ربو', 'التهاب رئوي'],
@@ -138,7 +121,6 @@ const DIAGNOSIS_SUGGESTIONS = {
   'ضيق تنفس': ['ربو', 'التهاب رئوي', 'خانوق']
 };
 
-// ============ Discharge Checklist ============
 const DISCHARGE_CHECKLIST = [
   'استقرار العلامات الحيوية لمدة 24 ساعة',
   'إكمال كورس العلاج المناسب',
@@ -147,11 +129,6 @@ const DISCHARGE_CHECKLIST = [
   'تقرير طبي نهائي مُوقَّع'
 ];
 
-// ============ Utility Functions ============
-
-/**
- * Format date in Arabic
- */
 function formatDate(dateString) {
   if (!dateString) return '—';
   const d = new Date(dateString);
@@ -161,9 +138,6 @@ function formatDate(dateString) {
   });
 }
 
-/**
- * Format time in Arabic
- */
 function formatTime(dateString) {
   if (!dateString) return '—';
   const d = new Date(dateString);
@@ -173,16 +147,11 @@ function formatTime(dateString) {
   });
 }
 
-/**
- * Format date + time
- */
 function formatDateTime(dateString) {
+  if (!dateString) return '—'; // FIXED: Added null check
   return `${formatDate(dateString)} ${formatTime(dateString)}`;
 }
 
-/**
- * Time ago in Arabic
- */
 function timeAgo(dateString) {
   const d = new Date(dateString);
   const now = new Date();
@@ -194,9 +163,6 @@ function timeAgo(dateString) {
   return formatDate(dateString);
 }
 
-/**
- * Escape HTML to prevent XSS
- */
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -207,16 +173,10 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-/**
- * Generate unique ID
- */
 function generateId(prefix = 'id') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-/**
- * Check if a task is overdue
- */
 function isTaskOverdue(task) {
   if (task.completed) return false;
   if (!task.dueDate) return false;
@@ -230,9 +190,6 @@ function isTaskOverdue(task) {
   return new Date() > due;
 }
 
-/**
- * Check if a task is due soon (within 2 hours)
- */
 function isTaskDueSoon(task) {
   if (task.completed || isTaskOverdue(task)) return false;
   if (!task.dueDate) return false;
@@ -245,9 +202,6 @@ function isTaskDueSoon(task) {
   return diff > 0 && diff < 2 * 60 * 60 * 1000;
 }
 
-/**
- * Analyze vitals and return warnings
- */
 function analyzeVitals(vitals) {
   const warnings = [];
   if (!vitals) return warnings;
@@ -282,9 +236,6 @@ function analyzeVitals(vitals) {
   return warnings;
 }
 
-/**
- * Suggest diagnoses based on symptoms (simulated AI)
- */
 function suggestDiagnoses(symptoms) {
   if (!symptoms || typeof symptoms !== 'string') return [];
   const lower = symptoms.toLowerCase();
@@ -297,7 +248,6 @@ function suggestDiagnoses(symptoms) {
   return Array.from(suggestions);
 }
 
-// Export to global scope
 window.ROLES = ROLES;
 window.TABS = TABS;
 window.PATIENT_STATUS = PATIENT_STATUS;
