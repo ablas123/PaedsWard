@@ -1,5 +1,4 @@
-// CoreWard - StateManager
-// Central state management with IndexedDB + Server Sync
+// CoreWard - StateManager (Fixed: await in loginUser)
 
 class StateManager {
   constructor() {
@@ -21,20 +20,17 @@ class StateManager {
     this.dbStoreName = 'appState';
     this.db = null;
     this.syncTimer = null;
-    this.syncIntervalMs = 30000; // 30 seconds
+    this.syncIntervalMs = 30000;
   }
 
-  // ============ IndexedDB Setup ============
   async initDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, 1);
-
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
         this.db = request.result;
         resolve(this.db);
       };
-
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(this.dbStoreName)) {
@@ -95,14 +91,11 @@ class StateManager {
     });
   }
 
-  // ============ Load & Save ============
   async load() {
     try {
       await this.initDB();
       const savedState = await this.loadFromIndexedDB('state');
-      if (savedState) {
-        this.state = { ...this.state, ...savedState };
-      }
+      if (savedState) this.state = { ...this.state, ...savedState };
       await this.loadSyncQueueFromIndexedDB();
       EventBus.emit('stateLoaded', this.state);
       return this.state;
@@ -123,7 +116,6 @@ class StateManager {
     }
   }
 
-  // ============ Authentication ============
   async loginUser(email, password) {
     try {
       const response = await fetch('/api/login', {
@@ -137,7 +129,7 @@ class StateManager {
       this.state.currentUser = data.user;
       await this.save();
 
-      // Load full state after login
+      // FIXED: Added await
       await this.syncFullState();
       this.startAutoSync();
 
@@ -160,11 +152,8 @@ class StateManager {
     return this.state.currentUser;
   }
 
-  // ============ CRUD Operations ============
   async addItem(collection, item) {
-    if (!this.state[collection]) {
-      throw new Error(`Invalid collection: ${collection}`);
-    }
+    if (!this.state[collection]) throw new Error(`Invalid collection: ${collection}`);
 
     const now = new Date().toISOString();
     const newItem = {
@@ -175,12 +164,10 @@ class StateManager {
       createdBy: this.state.currentUser?.id
     };
 
-    // Add to local state immediately (optimistic)
     this.state[collection].push(newItem);
     await this.save();
     EventBus.emit('stateChanged', { collection, action: 'add', item: newItem });
 
-    // Queue for sync
     if (this.isOnline && this.state.currentUser) {
       this._syncAdd(collection, newItem);
     } else {
@@ -191,9 +178,7 @@ class StateManager {
   }
 
   async updateItem(collection, id, updates) {
-    if (!this.state[collection]) {
-      throw new Error(`Invalid collection: ${collection}`);
-    }
+    if (!this.state[collection]) throw new Error(`Invalid collection: ${collection}`);
 
     const idx = this.state[collection].findIndex(x => x.id === id);
     if (idx === -1) throw new Error(`Item not found: ${id}`);
@@ -202,7 +187,7 @@ class StateManager {
     const updated = {
       ...this.state[collection][idx],
       ...updates,
-      id: id, // prevent id override
+      id: id,
       updatedAt: now,
       updatedBy: this.state.currentUser?.id
     };
@@ -221,9 +206,7 @@ class StateManager {
   }
 
   async deleteItem(collection, id) {
-    if (!this.state[collection]) {
-      throw new Error(`Invalid collection: ${collection}`);
-    }
+    if (!this.state[collection]) throw new Error(`Invalid collection: ${collection}`);
 
     const idx = this.state[collection].findIndex(x => x.id === id);
     if (idx === -1) throw new Error(`Item not found: ${id}`);
@@ -242,7 +225,6 @@ class StateManager {
     return deleted;
   }
 
-  // ============ Server Sync ============
   async _syncAdd(collection, item) {
     try {
       const response = await this._apiCall('/api/sync', {
@@ -252,7 +234,6 @@ class StateManager {
       if (!response.ok) throw new Error('Sync failed');
       const data = await response.json();
       if (data.result && data.result.id !== item.id) {
-        // Server assigned different ID
         const idx = this.state[collection].findIndex(x => x.id === item.id);
         if (idx !== -1) {
           this.state[collection][idx].id = data.result.id;
@@ -273,7 +254,6 @@ class StateManager {
       });
       if (!response.ok) throw new Error('Sync failed');
       const data = await response.json();
-      // Server wins if newer
       if (data.result && data.result.updatedAt !== updates.updatedAt) {
         const idx = this.state[collection].findIndex(x => x.id === id);
         if (idx !== -1) {
@@ -314,7 +294,6 @@ class StateManager {
     return fetch(url, { ...options, headers });
   }
 
-  // ============ Sync Queue ============
   _queueSync(operation) {
     const entry = {
       id: generateId('sq'),
@@ -340,7 +319,7 @@ class StateManager {
         else if (op.action === 'delete') await this._syncDelete(op.collection, op.id);
       } catch (err) {
         console.error('[StateManager] Queue processing error:', err);
-        this._queueSync(op); // Re-queue on failure
+        this._queueSync(op);
       }
     }
   }
@@ -353,7 +332,6 @@ class StateManager {
       if (!response.ok) throw new Error('Failed to fetch state');
       const serverState = await response.json();
 
-      // Merge: server wins if newer
       ['patients', 'tasks', 'handovers', 'clinicSlots', 'teamMembers', 'teamMessages', 'auditLog', 'alerts', 'users'].forEach(collection => {
         const serverItems = serverState[collection] || [];
         const localItems = this.state[collection] || [];
@@ -383,7 +361,6 @@ class StateManager {
     }
   }
 
-  // ============ Auto Sync ============
   startAutoSync() {
     this.stopAutoSync();
     this.syncTimer = setInterval(() => {
@@ -398,13 +375,11 @@ class StateManager {
     }
   }
 
-  // ============ Network Status ============
   setOnline(online) {
     const wasOffline = !this.isOnline;
     this.isOnline = online;
     EventBus.emit(online ? 'networkOnline' : 'networkOffline');
     if (wasOffline && online) {
-      // Came back online - sync
       setTimeout(() => {
         this.processSyncQueue();
         this.syncFullState();
@@ -412,7 +387,6 @@ class StateManager {
     }
   }
 
-  // ============ Alerts ============
   async addAlert(title, message, targetRole, targetIntern) {
     return this.addItem('alerts', {
       title,
@@ -424,7 +398,6 @@ class StateManager {
     });
   }
 
-  // ============ Helpers ============
   getPatients() { return this.state.patients || []; }
   getTasks() { return this.state.tasks || []; }
   getHandovers() { return this.state.handovers || []; }
@@ -442,7 +415,6 @@ class StateManager {
     return this.state.users.find(u => u.id === id);
   }
 
-  // ============ Export/Import ============
   exportData() {
     const data = {
       version: '1.0.0',
@@ -481,5 +453,4 @@ class StateManager {
   }
 }
 
-// Global singleton
 window.stateManager = new StateManager();
