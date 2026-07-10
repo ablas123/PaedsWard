@@ -1,9 +1,10 @@
-// CoreWard - Ward Component
-// Patient management and ward view
+// CoreWard - Ward Component (Complete + Enhanced)
+// Patient management with Vitals History + Growth Charts
 
 class WardComponent {
   constructor() {
     this.container = document.getElementById('appMain');
+    this.currentPatientId = null;
     this.bindEvents();
   }
 
@@ -22,18 +23,20 @@ class WardComponent {
         <div class="empty-state">
           <div class="empty-state-icon">🛏️</div>
           <div class="empty-state-text">لا توجد مرضى حالياً</div>
-          <button class="btn btn-primary" onclick="window.app.components.ward.showAdmissionForm()">
-            إضافة مريض جديد
-          </button>
+          ${hasPermission(currentUser.role, 'admit_patients') ? `
+            <button class="btn btn-primary" onclick="window.app.components.ward.showAdmissionForm()">
+              إضافة مريض جديد
+            </button>
+          ` : ''}
         </div>
       `;
       return;
     }
 
-    // Group by status
-    const stable = filteredPatients.filter(p => p.status === 'stable');
-    const followup = filteredPatients.filter(p => p.status === 'followup');
     const critical = filteredPatients.filter(p => p.status === 'critical');
+    const followup = filteredPatients.filter(p => p.status === 'followup');
+    const stable = filteredPatients.filter(p => p.status === 'stable');
+    const discharged = filteredPatients.filter(p => p.status === 'discharged');
 
     let html = '';
 
@@ -50,6 +53,11 @@ class WardComponent {
     if (stable.length > 0) {
       html += `<h3 class="section-title">✅ مستقر (${stable.length})</h3>`;
       html += stable.map(p => this.renderPatientCard(p)).join('');
+    }
+
+    if (discharged.length > 0) {
+      html += `<h3 class="section-title">📤 تم خروجهم (${discharged.length})</h3>`;
+      html += discharged.slice(0, 5).map(p => this.renderPatientCard(p)).join('');
     }
 
     this.container.innerHTML = html;
@@ -128,10 +136,11 @@ class WardComponent {
   }
 
   nextStep() {
-    // Validate step 1
     const name = document.getElementById('admitName')?.value;
     const age = document.getElementById('admitAge')?.value;
-    if (!name || !age) {
+    const gender = document.getElementById('admitGender')?.value;
+    
+    if (!name || !age || !gender) {
       window.app.showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
       return;
     }
@@ -148,7 +157,8 @@ class WardComponent {
       </div>
       <div class="form-group">
         <label>الأعراض</label>
-        <textarea id="admitSymptoms" rows="3" placeholder="صف الأعراض..."></textarea>
+        <textarea id="admitSymptoms" rows="3" placeholder="صف الأعراض..." oninput="window.app.components.ward.suggestDiagnosis()"></textarea>
+        <div id="diagnosisSuggestions" class="form-hint"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -176,6 +186,21 @@ class WardComponent {
       <button class="btn btn-secondary" onclick="window.app.components.ward.showAdmissionForm()">السابق</button>
       <button class="btn btn-primary" onclick="window.app.components.ward.nextStep2()">التالي</button>
     `);
+  }
+
+  suggestDiagnosis() {
+    const symptoms = document.getElementById('admitSymptoms')?.value || '';
+    const suggestions = suggestDiagnoses(symptoms);
+    const suggestionsEl = document.getElementById('diagnosisSuggestions');
+    
+    if (suggestions.length > 0) {
+      suggestionsEl.innerHTML = `
+        <strong>💡 تشخيصات مقترحة:</strong><br>
+        ${suggestions.map(s => `<span class="badge badge-info" style="margin:2px;">${s}</span>`).join('')}
+      `;
+    } else {
+      suggestionsEl.innerHTML = '';
+    }
   }
 
   nextStep2() {
@@ -228,7 +253,6 @@ class WardComponent {
       const chronic = document.getElementById('admitChronic').value;
       const notes = document.getElementById('admitNotes').value;
 
-      // Vitals
       const vitals = {};
       const hr = document.getElementById('admitHr').value;
       const spo2 = document.getElementById('admitSpo2').value;
@@ -240,7 +264,6 @@ class WardComponent {
       if (temp) vitals.temp = parseFloat(temp);
       if (rr) vitals.rr = parseInt(rr);
 
-      // Assign intern if current user is intern
       const currentUser = window.stateManager.getCurrentUser();
       const assignedIntern = currentUser.role === 'intern' ? currentUser.id : null;
 
@@ -257,13 +280,19 @@ class WardComponent {
         notes: notes || '',
         status: 'stable',
         vitals,
+        vitalsHistory: vitals.hr || vitals.spo2 || vitals.temp || vitals.rr ? [{
+          ...vitals,
+          timestamp: new Date().toISOString(),
+          recordedBy: currentUser.id
+        }] : [],
         assignedIntern,
-        soap: []
+        soap: [],
+        weightHistory: []
       };
 
       await window.stateManager.addItem('patients', patient);
       window.app.showToast('تم إدخال المريض بنجاح!', 'success');
-      window.app.components.ward.closeModal();
+      this.closeModal();
     } catch (err) {
       console.error('Admission error:', err);
       window.app.showToast('فشل إدخال المريض: ' + (err.message || ''), 'error');
@@ -271,25 +300,28 @@ class WardComponent {
   }
 
   closeModal() {
-    document.getElementById('modalContainer').classList.remove('active');
-    setTimeout(() => document.getElementById('modalContainer').innerHTML = '', 300);
+    const container = document.getElementById('modalContainer');
+    container.classList.remove('active');
+    setTimeout(() => {
+      container.innerHTML = '';
+      this.currentPatientId = null;
+    }, 300);
   }
 
   viewPatient(id) {
     const patient = window.stateManager.getPatientById(id);
     if (!patient) return;
 
+    this.currentPatientId = id;
     const status = PATIENT_STATUS[patient.status] || PATIENT_STATUS.stable;
     const age = patient.age ? `${patient.age} سنة` : '—';
     const bed = patient.bed ? `سرير ${patient.bed}` : '—';
-    const vitals = patient.vitals || {};
-    const assignedIntern = patient.assignedIntern ? 
-      (window.stateManager.getUserById(patient.assignedIntern)?.name || 'غير معروف') : 'غير مخصص';
 
     let tabsHtml = `
       <div class="tabs">
         <button class="tab active" data-tab="overview">نظرة عامة</button>
         <button class="tab" data-tab="vitals">العلامات الحيوية</button>
+        <button class="tab" data-tab="growth">النمو</button>
         <button class="tab" data-tab="meds">الأدوية</button>
         <button class="tab" data-tab="notes">الملاحظات</button>
         <button class="tab" data-tab="soap">SOAP</button>
@@ -315,7 +347,6 @@ class WardComponent {
       `<button class="btn btn-secondary" onclick="window.app.components.ward.closeModal()">إغلاق</button>`
     );
 
-    // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -325,6 +356,7 @@ class WardComponent {
         switch (tabId) {
           case 'overview': content = this.renderPatientOverview(patient); break;
           case 'vitals': content = this.renderPatientVitals(patient); break;
+          case 'growth': content = this.renderPatientGrowth(patient); break;
           case 'meds': content = this.renderPatientMeds(patient); break;
           case 'notes': content = this.renderPatientNotes(patient); break;
           case 'soap': content = this.renderPatientSoap(patient); break;
@@ -357,6 +389,7 @@ class WardComponent {
   renderPatientVitals(patient) {
     const vitals = patient.vitals || {};
     const warnings = analyzeVitals(vitals);
+    const vitalsHistory = patient.vitalsHistory || [];
     
     let vitalsHtml = '';
     Object.keys(VITALS_RANGES).forEach(key => {
@@ -373,6 +406,12 @@ class WardComponent {
       }
     });
 
+    // Vitals History Chart
+    let chartHtml = '';
+    if (vitalsHistory.length > 1) {
+      chartHtml = this.renderVitalsChart(vitalsHistory);
+    }
+
     return `
       ${warnings.length > 0 ? `
         <div class="card danger">
@@ -385,7 +424,44 @@ class WardComponent {
       <div class="vitals-grid">
         ${vitalsHtml || '<div class="empty-state" style="padding:20px;">لا توجد علامات حيوية مسجلة</div>'}
       </div>
+      ${chartHtml}
       <button class="btn btn-primary mt-3" onclick="window.app.components.ward.updateVitals('${patient.id}')">تحديث العلامات الحيوية</button>
+    `;
+  }
+
+  renderVitalsChart(history) {
+    if (history.length < 2) return '';
+
+    const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const maxHr = Math.max(...sorted.map(h => h.hr || 0));
+    const minHr = Math.min(...sorted.filter(h => h.hr).map(h => h.hr));
+    const range = maxHr - minHr || 1;
+
+    const points = sorted.map((h, i) => {
+      if (!h.hr) return null;
+      const x = (i / (sorted.length - 1)) * 100;
+      const y = 100 - ((h.hr - minHr) / range) * 100;
+      return `${x},${y}`;
+    }).filter(p => p).join(' ');
+
+    return `
+      <div class="card mt-3">
+        <div class="card-title">📈 تاريخ النبض</div>
+        <div class="card-body">
+          <svg viewBox="0 0 100 100" style="width:100%;height:150px;background:var(--gray-50);border-radius:8px;">
+            <polyline points="${points}" fill="none" stroke="var(--primary)" stroke-width="2" />
+            ${sorted.map((h, i) => {
+              if (!h.hr) return '';
+              const x = (i / (sorted.length - 1)) * 100;
+              const y = 100 - ((h.hr - minHr) / range) * 100;
+              return `<circle cx="${x}" cy="${y}" r="1.5" fill="var(--primary)" />`;
+            }).join('')}
+          </svg>
+          <div class="text-xs text-muted mt-2">
+            آخر ${sorted.length} قراءات • من ${formatDate(sorted[0].timestamp)} إلى ${formatDate(sorted[sorted.length-1].timestamp)}
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -419,6 +495,16 @@ class WardComponent {
         <label>الضغط (mmHg)</label>
         <input type="text" id="updateBp" value="${vitals.bp || ''}" placeholder="مثال: 120/80" />
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>الوزن (كغ)</label>
+          <input type="number" id="updateWeight" value="" min="0" step="0.1" placeholder="مثال: 15.5" />
+        </div>
+        <div class="form-group">
+          <label>الطول (سم)</label>
+          <input type="number" id="updateHeight" value="" min="0" step="0.1" placeholder="مثال: 105" />
+        </div>
+      </div>
     `;
 
     window.app.showModal('تحديث العلامات الحيوية', form, `
@@ -429,12 +515,17 @@ class WardComponent {
 
   async saveVitals(id) {
     try {
+      const patient = window.stateManager.getPatientById(id);
+      const currentUser = window.stateManager.getCurrentUser();
+      
       const vitals = {};
       const hr = document.getElementById('updateHr').value;
       const spo2 = document.getElementById('updateSpo2').value;
       const temp = document.getElementById('updateTemp').value;
       const rr = document.getElementById('updateRr').value;
       const bp = document.getElementById('updateBp').value;
+      const weight = document.getElementById('updateWeight').value;
+      const height = document.getElementById('updateHeight').value;
       
       if (hr) vitals.hr = parseInt(hr);
       if (spo2) vitals.spo2 = parseInt(spo2);
@@ -442,13 +533,96 @@ class WardComponent {
       if (rr) vitals.rr = parseInt(rr);
       if (bp) vitals.bp = bp;
 
-      await window.stateManager.updateItem('patients', id, { vitals });
+      // Add to vitals history
+      const vitalsHistory = [...(patient.vitalsHistory || [])];
+      if (hr || spo2 || temp || rr) {
+        vitalsHistory.push({
+          ...vitals,
+          timestamp: new Date().toISOString(),
+          recordedBy: currentUser.id
+        });
+      }
+
+      // Add to weight history
+      const weightHistory = [...(patient.weightHistory || [])];
+      if (weight) {
+        weightHistory.push({
+          weight: parseFloat(weight),
+          height: height ? parseFloat(height) : null,
+          timestamp: new Date().toISOString(),
+          recordedBy: currentUser.id
+        });
+      }
+
+      await window.stateManager.updateItem('patients', id, { 
+        vitals, 
+        vitalsHistory,
+        weightHistory
+      });
+      
       window.app.showToast('تم تحديث العلامات الحيوية!', 'success');
-      window.app.components.ward.closeModal();
+      this.closeModal();
     } catch (err) {
       console.error('Vitals update error:', err);
       window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
     }
+  }
+
+  renderPatientGrowth(patient) {
+    const weightHistory = patient.weightHistory || [];
+    
+    if (weightHistory.length === 0) {
+      return `
+        <div class="empty-state">
+          <div class="empty-state-icon">📊</div>
+          <div class="empty-state-text">لا توجد بيانات نمو مسجلة</div>
+          <button class="btn btn-primary mt-3" onclick="window.app.components.ward.updateVitals('${patient.id}')">تسجيل الوزن والطول</button>
+        </div>
+      `;
+    }
+
+    const sorted = [...weightHistory].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const maxWeight = Math.max(...sorted.map(w => w.weight));
+    const minWeight = Math.min(...sorted.map(w => w.weight));
+    const range = maxWeight - minWeight || 1;
+
+    const points = sorted.map((w, i) => {
+      const x = (i / (sorted.length - 1)) * 100;
+      const y = 100 - ((w.weight - minWeight) / range) * 100;
+      return `${x},${y}`;
+    }).join(' ');
+
+    return `
+      <div class="card">
+        <div class="card-title">📊 منحنى الوزن</div>
+        <div class="card-body">
+          <svg viewBox="0 0 100 100" style="width:100%;height:200px;background:var(--gray-50);border-radius:8px;">
+            <!-- Reference curves (simulated) -->
+            <polyline points="0,80 100,20" fill="none" stroke="var(--success)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
+            <polyline points="0,90 100,40" fill="none" stroke="var(--warning)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
+            <polyline points="0,95 100,60" fill="none" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
+            
+            <!-- Actual weight curve -->
+            <polyline points="${points}" fill="none" stroke="var(--primary)" stroke-width="2.5" />
+            ${sorted.map((w, i) => {
+              const x = (i / (sorted.length - 1)) * 100;
+              const y = 100 - ((w.weight - minWeight) / range) * 100;
+              return `<circle cx="${x}" cy="${y}" r="2" fill="var(--primary)" />`;
+            }).join('')}
+          </svg>
+          <div class="text-xs text-muted mt-2">
+            آخر ${sorted.length} قياسات • من ${formatDate(sorted[0].timestamp)} إلى ${formatDate(sorted[sorted.length-1].timestamp)}
+          </div>
+          <div class="text-xs mt-2">
+            <span style="color:var(--success);">━━</span> percentile 97<br>
+            <span style="color:var(--warning);">━━</span> percentile 75<br>
+            <span style="color:var(--danger);">━━</span> percentile 50<br>
+            <span style="color:var(--primary);">━━</span> وزن المريض
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary mt-3" onclick="window.app.components.ward.updateVitals('${patient.id}')">تسجيل قياس جديد</button>
+    `;
   }
 
   renderPatientMeds(patient) {
@@ -602,7 +776,6 @@ class WardComponent {
       await window.stateManager.updateItem('patients', id, { soap });
       window.app.showToast('تم حفظ SOAP!', 'success');
       
-      // Clear form
       document.getElementById('soapS').value = '';
       document.getElementById('soapO').value = '';
       document.getElementById('soapA').value = '';
@@ -647,7 +820,6 @@ class WardComponent {
   }
 
   async confirmDischarge(id) {
-    // Check if all checkboxes are checked
     const checkboxes = document.querySelectorAll('#patientContent input[type="checkbox"]');
     const allChecked = Array.from(checkboxes).every(cb => cb.checked);
     
@@ -664,7 +836,7 @@ class WardComponent {
         dischargeDate: new Date().toISOString()
       });
       window.app.showToast('تم خروج المريض بنجاح!', 'success');
-      window.app.components.ward.closeModal();
+      this.closeModal();
     } catch (err) {
       console.error('Discharge error:', err);
       window.app.showToast('فشل الخروج: ' + (err.message || ''), 'error');
@@ -673,6 +845,5 @@ class WardComponent {
 
   handleSearch(query) {
     if (!query) return;
-    // This will be handled by the main render
   }
 }
