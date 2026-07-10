@@ -5,33 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#1a73e8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="CoreWard - نظام إدارة العنابر الذكي للأطفال" />
-
   <title>CoreWard - نظام إدارة العنابر</title>
 
   <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{
-    "name": "CoreWard - نظام إدارة العنابر",
+    "name": "CoreWard",
     "short_name": "CoreWard",
     "start_url": "/",
     "display": "standalone",
     "background_color": "%23ffffff",
     "theme_color": "%231a73e8",
-    "orientation": "portrait",
     "lang": "ar",
     "dir": "rtl",
     "icons": [
       {
         "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Crect width=%27192%27 height=%27192%27 rx=%2732%27 fill=%27%231a73e8%27/%3E%3Ctext x=%2796%27 y=%27128%27 font-size=%27110%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27Arial%27%3EC%3C/text%3E%3C/svg%3E",
         "sizes": "192x192",
-        "type": "image/svg+xml",
-        "purpose": "any maskable"
-      },
-      {
-        "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 512 512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%2796%27 fill=%27%231a73e8%27/%3E%3Ctext x=%27256%27 y=%27340%27 font-size=%27300%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27Arial%27%3EC%3C/text%3E%3C/svg%3E",
-        "sizes": "512x512",
-        "type": "image/svg+xml",
-        "purpose": "any maskable"
+        "type": "image/svg+xml"
       }
     ]
   }' />
@@ -42,7 +31,7 @@
 </head>
 <body>
 
-  <!-- ============ Login Screen ============ -->
+  <!-- Login Screen -->
   <div id="loginScreen" class="login-screen">
     <div class="login-card">
       <div class="login-logo">🏥</div>
@@ -71,7 +60,7 @@
     </div>
   </div>
 
-  <!-- ============ Main App ============ -->
+  <!-- Main App -->
   <div id="app" class="app" style="display:none;">
 
     <header class="app-header">
@@ -88,10 +77,10 @@
           <span class="status-text" id="statusText">متصل</span>
         </div>
         <button class="icon-btn" id="btnSync" title="مزامنة">🔄</button>
-        <button class="icon-btn" id="btnExport" title="تصدير البيانات">📤</button>
-        <button class="icon-btn" id="btnImport" title="استيراد البيانات">📥</button>
+        <button class="icon-btn" id="btnExport" title="تصدير">📤</button>
+        <button class="icon-btn" id="btnImport" title="استيراد">📥</button>
         <input type="file" id="importFile" accept=".json" style="display:none;" />
-        <button class="icon-btn" id="btnLogout" title="تسجيل الخروج">🚪</button>
+        <button class="icon-btn" id="btnLogout" title="خروج">🚪</button>
       </div>
     </header>
 
@@ -109,10 +98,24 @@
     <div class="modal-container" id="modalContainer"></div>
   </div>
 
-  <!-- ============ Scripts (Order matters!) ============ -->
+  <!-- Scripts - الترتيب مهم جداً! -->
+  <script>
+    console.log('[CoreWard] 🔍 Starting to load scripts...');
+    window.addEventListener('error', function(e) {
+      console.error('[CoreWard] ❌ Script error:', e.filename, 'line', e.lineno, '-', e.message);
+    });
+  </script>
+
+  <!-- 1. EventBus أولاً -->
   <script src="/js/core/EventBus.js"></script>
+
+  <!-- 2. Constants -->
   <script src="/js/core/constants.js"></script>
+
+  <!-- 3. StateManager -->
   <script src="/js/core/StateManager.js"></script>
+
+  <!-- 4. Components -->
   <script src="/js/components/Dashboard.js"></script>
   <script src="/js/components/WardComponent.js"></script>
   <script src="/js/components/TasksComponent.js"></script>
@@ -122,13 +125,16 @@
   <script src="/js/components/AuditLog.js"></script>
   <script src="/js/components/UserManagement.js"></script>
   <script src="/js/components/SmartAlerts.js"></script>
+
+  <!-- 5. App (last) -->
   <script src="/js/app.js"></script>
+
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      window.addEventListener('load', function() {
         navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('✅ SW registered'))
-          .catch(err => console.warn('⚠️ SW registration failed:', err));
+          .then(function() { console.log('[CoreWard] ✅ SW registered'); })
+          .catch(function(err) { console.warn('[CoreWard] ⚠️ SW failed:', err); });
       });
     }
   </script>
