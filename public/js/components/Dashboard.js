@@ -1,5 +1,4 @@
-// CoreWard - Dashboard Component
-// Main dashboard with statistics and overview
+// CoreWard - Dashboard Component (Fixed: null check)
 
 class Dashboard {
   constructor() {
@@ -18,24 +17,20 @@ class Dashboard {
     const handovers = window.stateManager.getHandovers();
     const currentUser = window.stateManager.getCurrentUser();
 
-    // Filter by role
     const filteredPatients = this.filterPatientsByRole(patients, currentUser.role);
     const filteredTasks = this.filterTasksByRole(tasks, currentUser.role);
 
-    // Stats
     const activePatients = filteredPatients.filter(p => p.status !== 'discharged').length;
     const criticalPatients = filteredPatients.filter(p => p.status === 'critical').length;
     const pendingTasks = filteredTasks.filter(t => !t.completed).length;
     const urgentHandovers = handovers.filter(h => h.urgent).length;
     const totalPatients = filteredPatients.length;
 
-    // Upcoming tasks (next 3)
     const upcomingTasks = filteredTasks
-      .filter(t => !t.completed)
-      .sort((a, b) => new Date(a.dueDate || '9999') - new Date(b.dueDate || '9999'))
+      .filter(t => !t.completed && t.dueDate) // FIXED: Added null check
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
       .slice(0, 3);
 
-    // Patient distribution
     const statusCounts = {
       stable: filteredPatients.filter(p => p.status === 'stable').length,
       followup: filteredPatients.filter(p => p.status === 'followup').length,
@@ -150,21 +145,18 @@ class Dashboard {
 
   handleSearch(query) {
     if (!query) return;
-    // Search in patients, tasks, etc.
     const patients = window.stateManager.getPatients();
     const tasks = window.stateManager.getTasks();
     
     let results = [];
     
-    // Search in patients
     patients.forEach(p => {
       if (p.name.toLowerCase().includes(query.toLowerCase()) ||
-          p.diagnosis.toLowerCase().includes(query.toLowerCase())) {
+          (p.diagnosis && p.diagnosis.toLowerCase().includes(query.toLowerCase()))) {
         results.push({ type: 'patient', item: p });
       }
     });
     
-    // Search in tasks
     tasks.forEach(t => {
       if (t.description.toLowerCase().includes(query.toLowerCase())) {
         results.push({ type: 'task', item: t });
