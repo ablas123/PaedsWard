@@ -1,4 +1,4 @@
-// CoreWard - Backend Server
+// CoreWard - Backend Server (Fixed Version)
 // Node.js + Express + File-based JSON Storage
 
 const express = require('express');
@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const DEFAULT_DATA = {
   users: [
     {
-      id: 'u1',
+      id: 'u_admin',
       name: 'مدير النظام',
       email: 'admin@ward.com',
       password: bcrypt.hashSync('admin123', 10),
@@ -45,18 +45,37 @@ const DEFAULT_DATA = {
   syncQueue: []
 };
 
+// ============ Roles & Permissions ============
+const ROLES = {
+  director: ['manage_users', 'manage_patients', 'manage_tasks', 'manage_handovers', 'add_alert', 'view_reports', 'view_audit', 'manage_clinic', 'manage_team', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'admit_patients', 'view_patients', 'view_assigned_patients', 'create_handovers', 'complete_tasks'],
+  specialist: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports', 'view_assigned_patients', 'create_handovers'],
+  deputy: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports', 'view_assigned_patients', 'create_handovers'],
+  general: ['admit_patients', 'write_notes', 'view_patients', 'create_handovers', 'add_alert', 'view_assigned_patients'],
+  intern: ['admit_patients', 'write_notes', 'view_assigned_patients', 'complete_tasks']
+};
+
+function hasPermission(role, permission) {
+  const perms = ROLES[role] || [];
+  return perms.includes(permission);
+}
+
 // ============ Database Helpers ============
 function readDB() {
   try {
     if (!fs.existsSync(DB_PATH)) {
       writeDB(DEFAULT_DATA);
-      return DEFAULT_DATA;
+      return JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    // Ensure all collections exist
+    Object.keys(DEFAULT_DATA).forEach(key => {
+      if (!data[key]) data[key] = JSON.parse(JSON.stringify(DEFAULT_DATA[key]));
+    });
+    return data;
   } catch (err) {
     console.error('❌ Error reading database:', err);
-    return DEFAULT_DATA;
+    return JSON.parse(JSON.stringify(DEFAULT_DATA));
   }
 }
 
@@ -74,6 +93,21 @@ function generateId(prefix = 'id') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function sanitizeUser(user) {
+  const { password, ...rest } = user;
+  return rest;
+}
+
+// ============ Validation Helpers ============
+function isPositiveNumber(value) {
+  const num = Number(value);
+  return !isNaN(num) && num > 0 && isFinite(num);
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 // ============ Audit Log ============
 function addAuditLog(user, action, details) {
   const db = readDB();
@@ -84,7 +118,7 @@ function addAuditLog(user, action, details) {
     userName: user?.name || 'System',
     userRole: user?.role || 'system',
     action,
-    details
+    details: typeof details === 'string' ? details : JSON.stringify(details)
   };
   db.auditLog.unshift(entry);
   if (db.auditLog.length > 1000) db.auditLog = db.auditLog.slice(0, 1000);
@@ -108,14 +142,13 @@ function createBackup() {
     const backupPath = path.join(BACKUP_DIR, `backup_${timestamp}.json`);
     fs.copyFileSync(DB_PATH, backupPath);
 
-    // Keep only last MAX_BACKUPS
     const files = fs.readdirSync(BACKUP_DIR)
       .filter(f => f.startsWith('backup_') && f.endsWith('.json'))
       .sort()
       .reverse();
 
     files.slice(MAX_BACKUPS).forEach(f => {
-      try { fs.unlinkSync(path.join(BACKUP_DIR, f)); } catch (e) {}
+      try { fs.unlinkSync(path.join(BACKUP_DIR, f)); } catch (e) { /* ignore */ }
     });
 
     console.log(`✅ Backup created: ${backupPath}`);
@@ -129,32 +162,19 @@ function authMiddleware(req, res, next) {
   const userId = req.headers['x-user-id'];
   const userRole = req.headers['x-user-role'];
   if (!userId || !userRole) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized: missing credentials' });
   }
   const db = readDB();
   const user = db.users.find(u => u.id === userId);
   if (!user) return res.status(401).json({ error: 'User not found' });
+  if (user.role !== userRole) return res.status(403).json({ error: 'Role mismatch' });
   req.user = user;
   next();
 }
 
-// ============ Roles & Permissions ============
-const ROLES = {
-  director: ['manage_users', 'manage_patients', 'manage_tasks', 'manage_handovers', 'add_alert', 'view_reports', 'view_audit', 'manage_clinic', 'manage_team'],
-  specialist: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports'],
-  deputy: ['view_patients', 'discharge_patient', 'create_tasks', 'update_vitals', 'write_notes', 'view_reports'],
-  general: ['admit_patients', 'write_notes', 'view_patients', 'create_handovers', 'add_alert'],
-  intern: ['admit_patients', 'write_notes', 'view_assigned_patients', 'complete_tasks']
-};
-
-function hasPermission(role, permission) {
-  const perms = ROLES[role] || [];
-  return perms.includes(permission) || role === 'director';
-}
-
 // ============ API Routes ============
 
-// Ping (keep-alive)
+// Ping (keep-alive for Render free tier)
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
@@ -174,30 +194,27 @@ app.post('/api/login', (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     addAuditLog(user, 'login', 'User logged in');
-
-    const { password: _, ...safeUser } = user;
-    res.json({ success: true, user: safeUser });
+    res.json({ success: true, user: sanitizeUser(user) });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// Get full state (for sync)
+// Get full state (for sync) - FIXED
 app.get('/api/state', authMiddleware, (req, res) => {
   try {
     const db = readDB();
-    const { users, password, ...safeUsers } = { users: db.users.map(u => { const { password: _, ...rest } = u; return rest; }) };
     res.json({
-      patients: db.patients,
-      tasks: db.tasks,
-      handovers: db.handovers,
-      clinicSlots: db.clinicSlots,
-      teamMembers: db.teamMembers,
-      teamMessages: db.teamMessages,
-      auditLog: db.auditLog,
-      alerts: db.alerts,
-      users: db.users.map(u => { const { password: _, ...rest } = u; return rest; })
+      patients: db.patients || [],
+      tasks: db.tasks || [],
+      handovers: db.handovers || [],
+      clinicSlots: db.clinicSlots || [],
+      teamMembers: db.teamMembers || [],
+      teamMessages: db.teamMessages || [],
+      auditLog: db.auditLog || [],
+      alerts: db.alerts || [],
+      users: (db.users || []).map(sanitizeUser)
     });
   } catch (err) {
     console.error('State error:', err);
@@ -209,21 +226,50 @@ app.get('/api/state', authMiddleware, (req, res) => {
 app.post('/api/sync', authMiddleware, (req, res) => {
   try {
     const { collection, action, item, id, updates } = req.body;
-    const db = readDB();
+    if (!collection || !action) {
+      return res.status(400).json({ error: 'Missing collection or action' });
+    }
 
+    const db = readDB();
     if (!db[collection]) {
       return res.status(400).json({ error: 'Invalid collection' });
+    }
+
+    // Permission check
+    const permMap = {
+      patients: 'manage_patients',
+      tasks: 'manage_tasks',
+      handovers: 'manage_handovers',
+      clinicSlots: 'manage_clinic',
+      teamMessages: 'manage_team',
+      alerts: 'add_alert'
+    };
+    const requiredPerm = permMap[collection];
+    if (requiredPerm && !hasPermission(req.user.role, requiredPerm)) {
+      return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
     }
 
     let result;
     const now = new Date().toISOString();
 
     if (action === 'add') {
-      const newItem = { ...item, id: item.id || generateId(collection.slice(0, 3)), createdAt: now, updatedAt: now, createdBy: req.user.id };
+      if (!item || typeof item !== 'object') {
+        return res.status(400).json({ error: 'Invalid item' });
+      }
+      const newItem = {
+        ...item,
+        id: item.id || generateId(collection.slice(0, 3)),
+        createdAt: item.createdAt || now,
+        updatedAt: now,
+        createdBy: req.user.id
+      };
       db[collection].push(newItem);
       result = newItem;
       addAuditLog(req.user, `add_${collection}`, `Added to ${collection}`);
     } else if (action === 'update') {
+      if (!id || !updates) {
+        return res.status(400).json({ error: 'Missing id or updates' });
+      }
       const idx = db[collection].findIndex(x => x.id === id);
       if (idx === -1) return res.status(404).json({ error: 'Item not found' });
 
@@ -234,16 +280,25 @@ app.post('/api/sync', authMiddleware, (req, res) => {
       if (serverTime > clientTime) {
         result = db[collection][idx];
       } else {
-        db[collection][idx] = { ...db[collection][idx], ...updates, updatedAt: now, updatedBy: req.user.id };
+        db[collection][idx] = {
+          ...db[collection][idx],
+          ...updates,
+          id: id, // prevent id override
+          updatedAt: now,
+          updatedBy: req.user.id
+        };
         result = db[collection][idx];
       }
       addAuditLog(req.user, `update_${collection}`, `Updated ${id}`);
     } else if (action === 'delete') {
+      if (!id) return res.status(400).json({ error: 'Missing id' });
       const idx = db[collection].findIndex(x => x.id === id);
       if (idx === -1) return res.status(404).json({ error: 'Item not found' });
       db[collection].splice(idx, 1);
       result = { success: true };
       addAuditLog(req.user, `delete_${collection}`, `Deleted ${id}`);
+    } else {
+      return res.status(400).json({ error: 'Invalid action' });
     }
 
     writeDB(db);
@@ -258,16 +313,16 @@ app.post('/api/sync', authMiddleware, (req, res) => {
 app.post('/api/users', authMiddleware, (req, res) => {
   try {
     if (!hasPermission(req.user.role, 'manage_users')) {
-      return res.status(403).json({ error: 'Forbidden' });
+      return res.status(403).json({ error: 'Forbidden: Directors only' });
     }
     const { name, email, password, role } = req.body;
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'All fields required' });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email' });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
-    if (password.length < 4) {
+    if (typeof password !== 'string' || password.length < 4) {
       return res.status(400).json({ error: 'Password must be at least 4 characters' });
     }
     if (!ROLES[role]) {
@@ -281,8 +336,8 @@ app.post('/api/users', authMiddleware, (req, res) => {
 
     const newUser = {
       id: generateId('u'),
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password: bcrypt.hashSync(password, 10),
       role,
       createdAt: new Date().toISOString()
@@ -291,9 +346,7 @@ app.post('/api/users', authMiddleware, (req, res) => {
     writeDB(db);
 
     addAuditLog(req.user, 'create_user', `Created user ${email}`);
-
-    const { password: _, ...safeUser } = newUser;
-    res.json({ success: true, user: safeUser });
+    res.json({ success: true, user: sanitizeUser(newUser) });
   } catch (err) {
     console.error('Create user error:', err);
     res.status(500).json({ error: 'Failed to create user' });
@@ -303,7 +356,30 @@ app.post('/api/users', authMiddleware, (req, res) => {
 // List users
 app.get('/api/users', authMiddleware, (req, res) => {
   const db = readDB();
-  res.json(db.users.map(u => { const { password: _, ...rest } = u; return rest; }));
+  res.json((db.users || []).map(sanitizeUser));
+});
+
+// Delete user (Director only)
+app.delete('/api/users/:id', authMiddleware, (req, res) => {
+  try {
+    if (!hasPermission(req.user.role, 'manage_users')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { id } = req.params;
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+    const db = readDB();
+    const idx = db.users.findIndex(u => u.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'User not found' });
+    const deleted = db.users.splice(idx, 1)[0];
+    writeDB(db);
+    addAuditLog(req.user, 'delete_user', `Deleted user ${deleted.email}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
 });
 
 // Catch-all for SPA
@@ -313,21 +389,18 @@ app.get('*', (req, res) => {
 
 // ============ Start Server ============
 app.listen(PORT, () => {
-  console.log(`\n🏥 CoreWard Server is running on port ${PORT}`);
+  console.log('\n🏥 CoreWard Server is running');
   console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`👤 Admin: admin@ward.com / admin123\n`);
+  console.log(`👤 Admin: admin@ward.com / admin123`);
+  console.log(`📦 Node: ${process.version}\n`);
 
-  // Initial backup
   ensureBackupDir();
   createBackup();
-
-  // Schedule backups
   setInterval(createBackup, BACKUP_INTERVAL_MS);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, creating final backup...');
   createBackup();
   process.exit(0);
-}); 
+});
