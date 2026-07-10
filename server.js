@@ -1,4 +1,5 @@
-// CoreWard - Backend Server (Fixed: Permissions)
+// CoreWard - Backend Server (Complete + Fixed)
+// Node.js + Express + File-based JSON Storage
 
 const express = require('express');
 const cors = require('cors');
@@ -162,6 +163,8 @@ function authMiddleware(req, res, next) {
   next();
 }
 
+// ============ API Routes ============
+
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
@@ -219,7 +222,14 @@ app.post('/api/sync', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'Invalid collection' });
     }
 
-    // FIXED: Improved permission checking
+    // FIXED: Block users collection from sync endpoint
+    if (collection === 'users') {
+      return res.status(400).json({ 
+        error: 'Users collection must be managed via /api/users endpoint' 
+      });
+    }
+
+    // Permission checking
     const permMap = {
       patients: { add: 'admit_patients', update: 'manage_patients', delete: 'manage_patients' },
       tasks: { add: 'create_tasks', update: 'complete_tasks', delete: 'manage_tasks' },
