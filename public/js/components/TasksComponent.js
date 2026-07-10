@@ -1,5 +1,4 @@
-// CoreWard - Tasks Component
-// Task management system
+// CoreWard - Tasks Component (Fixed: priority class)
 
 class TasksComponent {
   constructor() {
@@ -30,7 +29,6 @@ class TasksComponent {
       return;
     }
 
-    // Sort tasks: overdue first, then by due date
     const sortedTasks = filteredTasks.sort((a, b) => {
       const aOverdue = isTaskOverdue(a);
       const bOverdue = isTaskOverdue(b);
@@ -58,12 +56,15 @@ class TasksComponent {
     const isDueSoon = isTaskDueSoon(task);
     const completedClass = task.completed ? 'completed' : '';
     
+    // FIXED: Use task.priority directly instead of priority.label.toLowerCase()
+    const priorityClass = task.priority || 'medium';
+    
     let statusText = '';
     if (isOverdue) statusText = '⏰ متأخر';
     else if (isDueSoon) statusText = '🕐 قريب';
 
     return `
-      <div class="task-item ${priority.label.toLowerCase()} ${completedClass}">
+      <div class="task-item ${priorityClass} ${completedClass}">
         <div class="task-check ${task.completed ? 'checked' : ''}" onclick="window.app.components.tasks.toggleTask('${task.id}', ${!task.completed})">
           ${task.completed ? '✓' : ''}
         </div>
@@ -84,16 +85,12 @@ class TasksComponent {
     const users = window.stateManager.getUsers();
     const currentUser = window.stateManager.getCurrentUser();
     
-    // Filter assignable users based on role
     let assignableUsers = users;
     if (currentUser.role === 'intern') {
-      // Interns can only assign to themselves
       assignableUsers = [currentUser];
     } else if (['general', 'specialist', 'deputy'].includes(currentUser.role)) {
-      // Can assign to interns and themselves
       assignableUsers = users.filter(u => u.role === 'intern' || u.id === currentUser.id);
     }
-    // Directors can assign to anyone
 
     const userOptions = assignableUsers.map(u => 
       `<option value="${u.id}">${getRoleEmoji(u.role)} ${u.name}</option>`
@@ -138,7 +135,6 @@ class TasksComponent {
       <button class="btn btn-primary" onclick="window.app.components.tasks.saveTask()">حفظ المهمة</button>
     `);
 
-    // Set default date to today
     document.getElementById('taskDueDate').valueAsDate = new Date();
   }
 
@@ -176,7 +172,6 @@ class TasksComponent {
   async toggleTask(id, completed) {
     try {
       await window.stateManager.updateItem('tasks', id, { completed });
-      // Auto-refresh
     } catch (err) {
       console.error('Task toggle error:', err);
       window.app.showToast('فشل التحديث: ' + (err.message || ''), 'error');
@@ -190,6 +185,5 @@ class TasksComponent {
 
   handleSearch(query) {
     if (!query) return;
-    // This will be handled by the main render
   }
 }
