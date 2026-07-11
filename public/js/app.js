@@ -1,32 +1,44 @@
-// CoreWard - Application Entry Point
+// CoreWard - Application Entry Point (Enhanced Debugging)
 
 (function() {
   'use strict';
 
-  // Safety check
+  console.log('[CoreWard] 🚀 App.js loading...');
+
   if (typeof EventBus === 'undefined' || !EventBus.emit) {
-    console.error('[CoreWard] ❌ EventBus not loaded! Check EventBus.js');
+    console.error('[CoreWard] ❌ EventBus not loaded!');
     document.body.innerHTML = '<div style="padding:20px;color:red;text-align:center;"><h1>خطأ في تحميل EventBus</h1><p>يرجى إعادة تحميل الصفحة (Ctrl+F5)</p></div>';
     return;
   }
 
-  console.log('[CoreWard] ✅ App starting...');
+  console.log('[CoreWard] ✅ EventBus OK');
 
   class App {
     constructor() {
       this.currentTab = 'dashboard';
       this.components = {};
       this.alertCheckInterval = null;
+      console.log('[CoreWard] 🔧 App constructor');
       this.init();
     }
 
     async init() {
       try {
+        console.log('[CoreWard] 🔄 Initializing...');
+        
+        if (!window.stateManager) {
+          throw new Error('StateManager not loaded');
+        }
+        
         await window.stateManager.load();
+        console.log('[CoreWard] ✅ StateManager loaded');
+        
         this.setupEventListeners();
         this.setupNetworkListeners();
 
         const currentUser = window.stateManager.getCurrentUser();
+        console.log('[CoreWard] 👤 Current user:', currentUser ? currentUser.name : 'None');
+        
         if (currentUser) {
           this.showApp();
           this.renderTabs();
@@ -35,9 +47,10 @@
         } else {
           this.showLogin();
         }
-        console.log('[CoreWard] ✅ App initialized');
+        console.log('[CoreWard] ✅ App initialized successfully');
       } catch (err) {
         console.error('[CoreWard] ❌ Init error:', err);
+        document.body.innerHTML = '<div style="padding:20px;color:red;text-align:center;"><h1>خطأ في التهيئة</h1><p>' + err.message + '</p></div>';
       }
     }
 
@@ -65,6 +78,7 @@
 
       EventBus.on('stateLoaded', function() { self.updateUI(); });
       EventBus.on('userLoggedIn', function(user) {
+        console.log('[CoreWard] ✅ User logged in:', user.name);
         self.showApp();
         self.renderTabs();
         self.showToast('تم تسجيل الدخول بنجاح!', 'success');
@@ -220,6 +234,8 @@
     }
 
     switchTab(tabId) {
+      console.log('[CoreWard] 🔄 Switching to tab:', tabId);
+      
       var tab = TABS.find(function(t) { return t.id === tabId; });
       var currentUser = window.stateManager.getCurrentUser();
 
@@ -233,8 +249,17 @@
         btn.classList.toggle('active', btn.dataset.tab === tabId);
       });
 
-      if (!this.components[tabId]) this.loadComponent(tabId);
-      if (this.components[tabId]) this.components[tabId].render();
+      if (!this.components[tabId]) {
+        console.log('[CoreWard] 📦 Loading component:', tabId);
+        this.loadComponent(tabId);
+      }
+      
+      if (this.components[tabId]) {
+        console.log('[CoreWard] 🎨 Rendering component:', tabId);
+        this.components[tabId].render();
+      } else {
+        console.error('[CoreWard] ❌ Component not found:', tabId);
+      }
 
       var fab = document.getElementById('fab');
       if (['ward', 'tasks', 'handover', 'clinic', 'users', 'alerts'].indexOf(tabId) !== -1) {
@@ -267,9 +292,14 @@
 
       var ComponentClass = componentMap[tabId];
       if (ComponentClass) {
-        this.components[tabId] = new ComponentClass();
+        try {
+          this.components[tabId] = new ComponentClass();
+          console.log('[CoreWard] ✅ Component loaded:', tabId);
+        } catch (err) {
+          console.error('[CoreWard] ❌ Failed to load component:', tabId, err);
+        }
       } else {
-        console.warn('Unknown tab:', tabId);
+        console.warn('[CoreWard] ⚠️ Unknown tab:', tabId);
       }
     }
 
@@ -408,7 +438,6 @@
     }
   }
 
-  // Initialize app
   window.app = new App();
   console.log('[CoreWard] ✅ App instance created');
 })();
